@@ -258,7 +258,7 @@ async function accountsView() {
     fetchOne('v_money_balances', 'name,kind,balance'),
     fetchOne('expenses', 'amount,cost_type'),
     fetchOne('suppliers', 'id,name'),
-    fetchOne('customers', 'id,name'),
+    fetchOne('customers', 'id,code,name,phone,address'),
   ]);
   const customerDue = invoiceBalances.reduce((s,r)=>s+Number(r.outstanding_total||0),0);
   const supplierDue = purchaseBalances.reduce((s,r)=>s+Number(r.remaining_amount||0),0);
