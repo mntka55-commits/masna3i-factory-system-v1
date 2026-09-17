@@ -39,7 +39,9 @@
     }
 
     document.querySelector('.modal-backdrop.sale-modal')?.remove();
-    const optionsCustomers = '';
+    const { data: customers, error: customersError } = await client.from('customers').select('id,code,name').order('name');
+    if (customersError) { alert(`تعذر تحميل العملاء: ${customersError.message}`); return; }
+    const optionsCustomers = (customers || []).map((c) => `<option value="${c.id}">${esc(c.code)} — ${esc(c.name)}</option>`).join('');
     const modal = document.createElement('div');
     modal.className = 'modal-backdrop sale-modal';
     modal.innerHTML = `<div class="modal-card sale-modal-card" role="dialog" aria-modal="true">
@@ -49,7 +51,7 @@
           <label>رقم الفاتورة<input id="saleInvoice" required maxlength="80" placeholder="مثال: INV-001" /></label>
           <label>تاريخ البيع<input id="saleDate" type="date" value="${today()}" required /></label>
         </div>
-        <label>العميل (اختياري)<select id="saleCustomer"><option value="">بدون عميل محدد</option>${optionsCustomers}</select></label>
+        <div class="form-grid"><label>العميل (اختياري)<select id="saleCustomer"><option value="">بدون عميل محدد</option>${optionsCustomers}</select></label><div style="display:flex;align-items:end"><button type="button" class="button secondary" id="addCustomerFromSale">＋ إضافة عميل</button></div></div>
         <div class="panel-subhead"><div><h4>بنود البيع</h4><span>كل بند يُخصم من READY عند التسجيل.</span></div><button type="button" class="button secondary" id="addSaleLine">＋ إضافة موديل</button></div>
         <div id="saleLines">${lineTemplate(ready, 0)}</div>
         <label>ملاحظات<textarea id="saleNotes" rows="2" placeholder="اختياري"></textarea></label>
@@ -60,6 +62,9 @@
     document.body.appendChild(modal);
 
     const close = () => modal.remove();
+    modal.querySelector('#addCustomerFromSale').onclick = () => {
+      if (window.__openCustomerModal) window.__openCustomerModal();
+    };
     modal.querySelectorAll('[data-close-sale]').forEach((b) => b.onclick = close);
 
     const lines = modal.querySelector('#saleLines');
