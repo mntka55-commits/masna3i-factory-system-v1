@@ -70,28 +70,12 @@ function onboardingScreen() {
 }
 
 function dashboardShell(membership) {
-  const canRunG5 = membership.role === 'owner' || membership.role === 'manager';
   screen.innerHTML = `
     <h2>مصنعي</h2>
     <p class="muted">تم تسجيل الدخول. الدور: ${membership.role}</p>
     <p class="muted">هذه نقطة البداية فقط. سنبني العمليات حسب الـCanonical Master، بدون إدخال أي منطق من RETAG.</p>
-    ${canRunG5 ? `<button id="g5Test" class="secondary">تشغيل اختبار G5</button>` : ''}
     <button id="logout">تسجيل الخروج</button>`;
   status('');
-
-  if (canRunG5) {
-    document.getElementById('g5Test').onclick = async () => {
-      const button = document.getElementById('g5Test');
-      button.disabled = true;
-      status('جارٍ تشغيل اختبار G5 الحقيقي من جلسة المستخدم…');
-      const { data, error } = await client.rpc('run_g5_test');
-      button.disabled = false;
-      if (error) return status(`فشل اختبار G5: ${error.message}`);
-      const details = data || {};
-      status(`G5 ${details.status}: شراء 300م + 100م، قص 200 قطعة، READY=${details.ready?.created_pieces ?? '—'}، WIP المتبقي=${details.wip?.remaining_after_ready ?? '—'}، رفض السحب الزائد=${details.overdraw_rejected ? 'نعم' : 'لا'}`);
-    };
-  }
-
   document.getElementById('logout').onclick = async () => { await client.auth.signOut(); await route(); };
 }
 
