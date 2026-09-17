@@ -10,6 +10,9 @@
   function enhanceShell() {
     const nav = document.querySelector('.sidebar nav');
     if (!nav) return;
+    const expected = ['dashboard','models','cutting','wip','ready','inventory','purchases','sales','invoices','collections','returns','accounts','reports'];
+    const existing = new Map([...nav.querySelectorAll('.nav-item')].map((button) => [button.dataset.nav, button]));
+    expected.forEach((id) => { if (!existing.has(id)) { const button = document.querySelector(`.nav-item[data-nav="${id}"]`); if (button) existing.set(id, button); } });
 
     if (nav.dataset.cohesionReady !== '1') {
       const buttons = new Map(
