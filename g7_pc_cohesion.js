@@ -8,9 +8,8 @@
   ];
 
   function enhanceShell() {
-    const appRoot = document.getElementById('app');
     const nav = document.querySelector('.sidebar nav');
-    if (!appRoot || !nav) return;
+    if (!nav) return;
 
     if (nav.dataset.cohesionReady !== '1') {
       const buttons = new Map(
@@ -41,14 +40,12 @@
 
     const dateNode = document.querySelector('.user-chip small');
     if (dateNode) {
-      dateNode.textContent = new Intl.DateTimeFormat('ar-EG', { dateStyle: 'medium' }).format(new Date());
+      const today = new Intl.DateTimeFormat('ar-EG', { dateStyle: 'medium' }).format(new Date());
+      if (dateNode.textContent !== today) dateNode.textContent = today;
     }
-
-    const active = document.querySelector('.nav-item.active');
-    if (active) active.setAttribute('aria-current', 'page');
   }
 
   const observer = new MutationObserver(enhanceShell);
-  observer.observe(document.body, { childList: true, subtree: true });
+  observer.observe(document.getElementById('app'), { childList: true, subtree: true });
   enhanceShell();
 })();
