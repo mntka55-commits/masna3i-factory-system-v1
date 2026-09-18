@@ -4,7 +4,7 @@ Greenfield factory-management system built from the Canonical Master dated 16/09
 
 ## Source of truth
 
-`FACTORY_SYSTEM_V1_CANONICAL_MASTER_CLEANED_2026-09-16.docx` is the authoritative product reference. Older RETAG/prototype rules are not implementation sources when they conflict with the Canonical Master.
+`FACTORY_SYSTEM_V1_CANONICAL_MASTER_CLEANED_2026-09-16.docx` is the authoritative product reference. Later explicit project decisions recorded in the current regression checkpoint supersede an older rule only where that later decision explicitly changes it. Older RETAG/prototype rules are not implementation sources when they conflict with the current source-of-truth chain.
 
 ## V1 operating boundary
 
