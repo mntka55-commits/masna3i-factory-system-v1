@@ -264,7 +264,11 @@
       b.dataset.supplierReturnBound = '1';
       b.addEventListener('click', openModal);
     });
-    renderPanel();
+    const panel = document.getElementById('supplierReturnsPanel');
+    if (panel && panel.dataset.bound !== '1') {
+      panel.dataset.bound = '1';
+      renderPanel();
+    }
   }
 
   new MutationObserver(bind).observe(document.body, { childList: true, subtree: true });
