@@ -291,7 +291,7 @@ select s.id as supplier_id,
 from public.suppliers s
 left join opening o on o.supplier_id=s.id
 left join purchases p on p.supplier_id=s.id
-left join payments pay on pay.supplier_id=p.supplier_id
+left join payments pay on pay.supplier_id=s.id
 left join returns r on r.supplier_id=s.id;
 
 create or replace view public.v_supplier_returns_report as
