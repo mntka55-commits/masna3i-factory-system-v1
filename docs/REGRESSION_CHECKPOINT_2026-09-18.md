@@ -81,3 +81,11 @@ A direct anonymous Data API call could not be executed from this environment bec
 The previous damaged-return disposition change was based on an older rule and has been reverted.
 Current V1 rule: customer return outcome is Good/Repair; return redelivery is a new invoice for the same customer when applicable; clearance/discounted sale is a separate SALE operation, not a return outcome; scrap is exceptional, not a normal return workflow.
 No test data remains from the reverted work.
+
+
+## Alignment correction — current return/reporting rules
+- Return outcomes are enforced as Good/Repair only at the database boundary; legacy enum labels are no longer accepted by `return_lines`.
+- Return redelivery remains a separate `return_redelivery` invoice for the same customer when applicable.
+- Return redelivery is shown separately for visibility but is excluded from sales-performance totals, net sales, COGS, and gross margin.
+- Clearance sale remains a separate `clearance_sale` operation.
+- The Returns UI no longer contains any legacy Scrap outcome label.
