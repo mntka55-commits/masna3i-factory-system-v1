@@ -50,6 +50,8 @@ Net Profit is not presented as a basic V1 report metric, consistent with the Can
 | Printing code review | PASS (code) | Printing/reprint functions only read operational data and call browser print; no write operation in print code |
 | Browser print/reprint visual test | PENDING | No browser/computer tool available in this execution |
 | Cross-factory isolation rerun | RETAINED PASS | Current DB has one factory + one active membership; prior G3 isolation test remains source-of-truth |
+| Non-member Reports isolation via SQL impersonation | NOT VALID AS A RUNTIME TEST | SQL MCP executes as postgres; auth.uid()/RLS cannot be impersonated this way. No application bug is inferred from this test. |
+| Reports access contract | PASS (DB contract) | New report views are security_invoker=true; authenticated SELECT=true; anon SELECT=false |
 
 ## Baseline after regression
 - Invoice 123: total 600, collected 0, outstanding 600
@@ -59,13 +61,15 @@ Net Profit is not presented as a basic V1 report metric, consistent with the Can
 - Temporary regression supplier-return rows: 0
 - Temporary stocktake regression movements: 0
 
+## Notes on runtime verification
+A direct anonymous Data API call could not be executed from this environment because external DNS/network resolution is unavailable. The database privilege contract was verified instead. A real non-member authenticated runtime test remains a later E2E item requiring an actual second authenticated identity.
+
 ## Next execution order
-1. Additional non-member/report isolation check.
-2. Retain or rerun recent transaction regressions only where changed.
-3. Close remaining browser visual checks when browser capability is available.
-4. Mobile V1 after PC Core + Regression closure.
-5. Pilot with the real factory.
-6. Any pilot issue is fixed at source, then impacted regression tests are rerun.
+1. Continue remaining backend regression where it is not already PASS or where recent changes affect it.
+2. Close remaining browser visual/E2E checks when browser capability is available.
+3. Mobile V1 after PC Core + Regression closure.
+4. Pilot with the real factory.
+5. Any pilot issue is fixed at source, then impacted regression tests are rerun.
 
 ## Rules
 - Canonical Master remains the business-rule source of truth.
