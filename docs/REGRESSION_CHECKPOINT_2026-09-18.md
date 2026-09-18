@@ -119,3 +119,14 @@ No test data remains from the reverted work.
   - Duplicate opening for same cash account/material is rejected.
   - Invalid zero values are rejected.
   - Tests executed inside rollback transactions; no regression data persisted.
+
+## Regression progress — account statements
+- Customer account statement backend regression: PASS.
+  - Temporary registered-customer sale: 300 EGP debit.
+  - Temporary collection: 100 EGP credit.
+  - Final running balance: 200 EGP.
+- Supplier account statement backend regression: PASS.
+  - PUR-001 purchase: 2000 EGP debit.
+  - Temporary supplier payment: 500 EGP credit.
+  - Final running balance: 1500 EGP.
+- Both tests ran inside rollback transactions; no regression data persisted.
