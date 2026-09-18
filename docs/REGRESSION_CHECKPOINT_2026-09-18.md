@@ -98,3 +98,24 @@ No test data remains from the reverted work.
 - Regression test passed with a temporary redelivery invoice: return_redelivery_sales=1000 while gross/net sales, COGS, and gross margin remained 0; temporary rows were removed.
 - Regression test passed for legacy return outcome rejection; temporary rows were removed.
 - Applied migration: 20260918125358_v1_align_return_reporting_rules.
+
+## Regression progress — return / printing / opening
+- Returns backend regression: PASS.
+  - Good return -> READY.
+  - Repair return -> damaged lot.
+  - Repair -> READY.
+  - Return redelivery -> new invoice for same customer, original/custom price accepted.
+  - Over-return rejected.
+  - Over-redelivery rejected.
+  - Over-repair rejected.
+  - Atomic return failure rolls back all partial work.
+- Printing/Reprint code review: PASS.
+  - Printing code reads invoice data and calls browser print only.
+  - No insert/update/delete/RPC write operation exists in printing_v1.js.
+  - Browser visual A4 print/reprint verification remains PENDING because browser/computer capability is unavailable.
+- Opening backend regression: PASS.
+  - Cash opening creates the opening money movement.
+  - Inventory opening creates opening inventory movement + layer.
+  - Duplicate opening for same cash account/material is rejected.
+  - Invalid zero values are rejected.
+  - Tests executed inside rollback transactions; no regression data persisted.
