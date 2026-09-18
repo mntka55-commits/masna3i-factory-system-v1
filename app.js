@@ -14,6 +14,7 @@ const NAV = [
   ['sales', '▥', 'المبيعات'],
   ['invoices', '▤', 'الفواتير'],
   ['collections', '▣', 'التحصيلات'],
+  ['expenses', '▤', 'المصروفات'],
   ['returns', '↩', 'المرتجعات'],
   ['accounts', '●', 'الحسابات'],
   ['customers', '●', 'العملاء'],
@@ -385,6 +386,176 @@ async function collectionsView() {
   document.getElementById('openCollectionForm').onclick = openForm;
 }
 
+
+async function expensesView() {
+  const [expenses, categories, accounts] = await Promise.all([
+    fetchOne('expenses', 'id,expense_number,category_id,expense_date,amount,cost_type,account_id,description,notes,created_at'),
+    fetchOne('expense_categories', 'id,name,default_cost_type,active'),
+    fetchOne('money_accounts', 'id,name,kind,active'),
+  ]);
+
+  const activeCategories = categories.filter((c) => c.active);
+  const activeAccounts = accounts.filter((a) => a.active);
+  const total = expenses.reduce((s, e) => s + Number(e.amount || 0), 0);
+  const fixedTotal = expenses.filter((e) => e.cost_type === 'fixed').reduce((s, e) => s + Number(e.amount || 0), 0);
+  const variableTotal = expenses.filter((e) => e.cost_type === 'variable').reduce((s, e) => s + Number(e.amount || 0), 0);
+
+  const rows = expenses
+    .slice()
+    .sort((a, b) => String(b.expense_date || b.created_at || '').localeCompare(String(a.expense_date || a.created_at || '')))
+    .map((e) => {
+      const category = categories.find((c) => c.id === e.category_id);
+      const account = accounts.find((a) => a.id === e.account_id);
+      return `<tr>
+        <td><b>${escapeHtml(e.expense_number)}</b></td>
+        <td>${escapeHtml(e.expense_date || '—')}</td>
+        <td>${escapeHtml(category?.name || '—')}</td>
+        <td>${e.cost_type === 'fixed' ? 'ثابت' : e.cost_type === 'variable' ? 'متغير' : escapeHtml(e.cost_type || '—')}</td>
+        <td><b>${money(e.amount)}</b></td>
+        <td>${escapeHtml(account?.name || '—')}</td>
+        <td>${escapeHtml(e.description || '—')}</td>
+      </tr>`;
+    });
+
+  document.getElementById('view').innerHTML = `
+    <div class="hero">
+      <div><h2>المصروفات</h2><p>المصروف حركة مستقلة، وتؤثر مباشرة على حساب النقدية/البنك عند تسجيلها.</p></div>
+      <button class="button" id="openExpenseForm">＋ تسجيل مصروف</button>
+    </div>
+    <div class="stats-grid">
+      ${statCard('▥','إجمالي المصروفات',money(total),`${qty(expenses.length)} حركة`)}
+      ${statCard('●','مصروفات ثابتة',money(fixedTotal),'لا تدخل في تكلفة الموديل')}
+      ${statCard('↗','مصروفات متغيرة',money(variableTotal),'منفصلة عن تكلفة الموديل')}
+      ${statCard('▣','حسابات الدفع',qty(activeAccounts.length),'نقدية / بنك نشطة')}
+    </div>
+    ${!activeCategories.length ? '<div class="panel note-panel"><h3>التصنيفات غير مُعدة</h3><p>لا توجد تصنيفات مصروفات نشطة حاليًا. تسجيل المصروف يتطلب تصنيفًا نشطًا؛ لم تتم إضافة تصنيفات افتراضية من التطبيق.</p></div>' : ''}
+    <div class="panel">
+      <div class="panel-head"><div><h3>حركات المصروفات</h3><span>كل حركة مرتبطة بتصنيف ونوع تكلفة وحساب نقدية/بنكية.</span></div></div>
+      ${table(['رقم المصروف','التاريخ','التصنيف','نوع التكلفة','القيمة','الحساب','الوصف'], rows, 'لا توجد مصروفات مسجلة حتى الآن.')}
+    </div>
+  `;
+
+  document.getElementById('openExpenseForm').onclick = () => {
+    const today = new Date().toISOString().slice(0, 10);
+    const stamp = new Date().toISOString().replace(/[-:TZ.]/g, '').slice(0, 14);
+    const categoryOptions = activeCategories.map((cat) =>
+      `<option value="${escapeHtml(cat.id)}" data-cost-type="${escapeHtml(cat.default_cost_type || 'fixed')}">${escapeHtml(cat.name)}</option>`
+    ).join('');
+    const accountOptions = activeAccounts.map((a) =>
+      `<option value="${escapeHtml(a.id)}">${escapeHtml(a.name)} — ${escapeHtml(a.kind === 'cash' ? 'نقدية' : 'بنك')}</option>`
+    ).join('');
+
+    document.body.insertAdjacentHTML('beforeend', `
+      <div class="modal-backdrop" id="expenseModal">
+        <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="expenseTitle">
+          <div class="modal-head">
+            <div><h3 id="expenseTitle">تسجيل مصروف</h3><span>تسجيل المصروف ينشئ حركة خروج من الحساب المختار.</span></div>
+            <button class="modal-close" id="closeExpense">×</button>
+          </div>
+          <form id="expenseForm" class="stack-form">
+            <label>رقم المصروف
+              <input id="expenseNumber" required maxlength="120" value="EXP-${stamp}" />
+            </label>
+            <label>التصنيف
+              <select id="expenseCategory" required ${activeCategories.length ? '' : 'disabled'}>
+                <option value="">${activeCategories.length ? 'اختر التصنيف' : 'لا توجد تصنيفات نشطة'}</option>
+                ${categoryOptions}
+              </select>
+            </label>
+            <label>نوع التكلفة
+              <select id="expenseCostType" required>
+                <option value="fixed">ثابت</option>
+                <option value="variable">متغير</option>
+              </select>
+              <small class="field-help">يُقترح النوع الافتراضي من التصنيف ويمكن تغييره قبل التسجيل.</small>
+            </label>
+            <label>المبلغ
+              <input id="expenseAmount" type="number" min="0.01" step="0.01" required placeholder="مثال: 500" />
+            </label>
+            <label>حساب الدفع
+              <select id="expenseAccount" required ${activeAccounts.length ? '' : 'disabled'}>
+                <option value="">${activeAccounts.length ? 'اختر النقدية / البنك' : 'لا يوجد حساب نشط'}</option>
+                ${accountOptions}
+              </select>
+              ${activeAccounts.length ? '' : '<small class="field-help">أنشئ حساب نقدية/بنك من شاشة الحسابات أولًا.</small>'}
+            </label>
+            <label>التاريخ
+              <input id="expenseDate" type="date" value="${today}" required />
+            </label>
+            <label>الوصف
+              <input id="expenseDescription" maxlength="300" placeholder="مثال: كهرباء المصنع" />
+            </label>
+            <label>ملاحظات
+              <input id="expenseNotes" maxlength="300" placeholder="ملاحظات (اختياري)" />
+            </label>
+            <div class="modal-actions">
+              <button type="button" class="button secondary" id="cancelExpense">إلغاء</button>
+              <button type="submit" class="button" id="saveExpense" ${activeCategories.length && activeAccounts.length ? '' : 'disabled'}>حفظ المصروف</button>
+            </div>
+            <div class="global-status" id="expenseStatus"></div>
+          </form>
+        </div>
+      </div>
+    `);
+
+    const modal = document.getElementById('expenseModal');
+    const categorySelect = document.getElementById('expenseCategory');
+    const costTypeSelect = document.getElementById('expenseCostType');
+    const status = document.getElementById('expenseStatus');
+    const saveButton = document.getElementById('saveExpense');
+    const close = () => modal?.remove();
+
+    categorySelect.addEventListener('change', () => {
+      const option = categorySelect.options[categorySelect.selectedIndex];
+      const suggested = option?.dataset?.costType;
+      if (suggested === 'fixed' || suggested === 'variable') costTypeSelect.value = suggested;
+    });
+
+    document.getElementById('closeExpense').onclick = close;
+    document.getElementById('cancelExpense').onclick = close;
+    modal.addEventListener('click', (e) => { if (e.target === modal) close(); });
+
+    document.getElementById('expenseForm').addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const expenseNumber = document.getElementById('expenseNumber').value.trim();
+      const categoryId = categorySelect.value;
+      const costType = costTypeSelect.value;
+      const amount = Number(document.getElementById('expenseAmount').value || 0);
+      const accountId = document.getElementById('expenseAccount').value;
+      if (!expenseNumber) return status.textContent = 'رقم المصروف مطلوب.';
+      if (!categoryId) return status.textContent = 'اختر تصنيف المصروف.';
+      if (amount <= 0) return status.textContent = 'مبلغ المصروف يجب أن يكون أكبر من صفر.';
+      if (!accountId) return status.textContent = 'اختر حساب النقدية/البنك.';
+      if (!['fixed','variable'].includes(costType)) return status.textContent = 'اختر نوع التكلفة.';
+
+      saveButton.disabled = true;
+      saveButton.textContent = 'جارٍ الحفظ…';
+
+      const { error } = await client.rpc('post_expense', {
+        p_expense_number: expenseNumber,
+        p_category_id: categoryId,
+        p_expense_date: document.getElementById('expenseDate').value,
+        p_amount: amount,
+        p_cost_type: costType,
+        p_account_id: accountId,
+        p_description: document.getElementById('expenseDescription').value.trim() || null,
+        p_notes: document.getElementById('expenseNotes').value.trim() || null,
+      });
+
+      if (error) {
+        status.textContent = `تعذر تسجيل المصروف: ${error.message}`;
+        saveButton.disabled = false;
+        saveButton.textContent = 'حفظ المصروف';
+        return;
+      }
+
+      close();
+      setStatus('تم تسجيل المصروف وتحديث رصيد الحساب.', 'info');
+      await renderRoute(true);
+    });
+  };
+}
+
 async function returnsView() {
   const rows = await fetchOne('returns', 'return_number,return_date,sale_id,customer_note,notes,created_at');
   const tr = rows.map((r) => `<tr><td>${escapeHtml(r.return_number)}</td><td>${escapeHtml(r.return_date)}</td><td>مرتجع مستقل</td><td>${escapeHtml(r.customer_note || r.notes || '—')}</td><td><span class="status-pill neutral">مراجعة</span></td></tr>`);
@@ -687,7 +858,7 @@ async function renderRoute() {
   const key = location.hash.replace('#','') || 'dashboard';
   if (!document.getElementById('view')) await buildShell();
   setActiveNav(key);
-  const loaders = { dashboard, models: modelsView, 'model-detail': modelDetailView, inventory: inventoryView, purchases: purchasesView, cutting: cuttingView, wip: wipView, ready: readyView, sales: salesView, invoices: invoicesView, collections: collectionsView, returns: returnsView, accounts: accountsView, customers: customersView, 'supplier-payments': supplierPaymentsView, suppliers: suppliersView, reports: reportsView };
+  const loaders = { dashboard, models: modelsView, 'model-detail': modelDetailView, inventory: inventoryView, purchases: purchasesView, cutting: cuttingView, wip: wipView, ready: readyView, sales: salesView, invoices: invoicesView, collections: collectionsView, expenses: expensesView, returns: returnsView, accounts: accountsView, customers: customersView, 'supplier-payments': supplierPaymentsView, suppliers: suppliersView, reports: reportsView };
   const loader = loaders[key] || dashboard;
   try { setStatus('جارٍ تحميل البيانات…'); await loader(); setStatus(''); } catch (error) { console.error(error); setStatus(`تعذر تحميل الشاشة: ${error.message}`, 'error'); }
 }
