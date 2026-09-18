@@ -17,6 +17,7 @@ const NAV = [
   ['expenses', '▤', 'المصروفات'],
   ['returns', '↩', 'المرتجعات'],
   ['accounts', '●', 'الحسابات'],
+  ['opening-setup', '◐', 'الإعداد الافتتاحي'],
   ['customers', '●', 'العملاء'],
   ['suppliers', '◆', 'الموردين'],
   ['supplier-payments', '⇄', 'مدفوعات الموردين'],
