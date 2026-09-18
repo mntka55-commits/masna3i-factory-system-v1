@@ -6,125 +6,268 @@
   if (!client) return;
   window.__masna3iClient = client;
 
-  const iso = (d) => d.toISOString().slice(0,10);
-  const monthAgo = () => { const d=new Date(); d.setDate(d.getDate()-29); return iso(d); };
+  const iso = (d) => d.toISOString().slice(0, 10);
+  const monthAgo = () => {
+    const d = new Date();
+    d.setDate(d.getDate() - 29);
+    return iso(d);
+  };
   const today = () => iso(new Date());
-  const inRange = (value, from, to) => String(value||'') >= from && String(value||'') <= to;
 
-  async function load(from,to) {
-    const [sales,cogs,returnCogs,returns,collections,fixedExp,allExp,customers,suppliers,dq,ready,wip,inventory] = await Promise.all([
-      client.from('v_sales_report').select('invoice_id,invoice_number,invoice_date,sale_id,customer_id,sale_kind,pieces,sales_amount'),
-      client.from('v_historical_cogs').select('sale_id,invoice_id,invoice_number,sale_date,sale_kind,model_id,quantity,cogs_amount'),
-      client.from('v_return_cogs').select('return_id,return_number,return_date,sale_id,pieces,returned_cogs'),
-      client.from('v_returns_report').select('return_id,return_number,return_date,sale_id,customer_id,return_line_id,model_id,quantity,outcome,financial_credit_amount'),
-      client.from('collections').select('amount,collection_date'),
-      client.from('expenses').select('amount,expense_date,cost_type').eq('cost_type','fixed'),
-      client.from('expenses').select('amount,expense_date,cost_type'),
-      client.from('v_customer_account_balances').select('customer_id,name,net_balance,amount_due,customer_credit'),
-      client.from('v_supplier_account_balances').select('supplier_id,name,payable_balance'),
-      client.from('v_reporting_data_quality').select('issue_code,issue_count'),
-      client.from('v_ready_balances').select('ready_pieces'),
-      client.from('v_wip_balances').select('wip_pieces'),
-      client.from('v_inventory_balances').select('current_quantity,minimum_stock')
+  const esc = (value) => String(value ?? '')
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#039;');
+
+  const sum = (rows, key) => rows.reduce((total, row) => total + Number(row?.[key] || 0), 0);
+
+  async function load(from, to) {
+    const [daily, models, inventory, customers, suppliers, dq, ready, wip, moneyBalances] = await Promise.all([
+      client
+        .from('v_reporting_daily_financials')
+        .select('report_date,normal_sales,clearance_sales,return_redelivery_sales,gross_sales,return_credits,net_sales,historical_cogs,returned_cogs,net_cogs,gross_margin,collections,fixed_expenses,variable_expenses,operating_expenses')
+        .gte('report_date', from)
+        .lte('report_date', to)
+        .order('report_date', { ascending: true }),
+      client
+        .from('v_model_sales_performance')
+        .select('report_date,sale_kind,model_id,model_code,model_name,pieces,sales_amount,historical_cogs')
+        .gte('report_date', from)
+        .lte('report_date', to)
+        .order('report_date', { ascending: true }),
+      client
+        .from('v_inventory_valuation')
+        .select('material_id,code,name,kind,unit,current_quantity,minimum_stock,inventory_value')
+        .order('code', { ascending: true }),
+      client
+        .from('v_customer_account_balances')
+        .select('customer_id,name,net_balance,amount_due,customer_credit'),
+      client
+        .from('v_supplier_account_balances')
+        .select('supplier_id,name,payable_balance'),
+      client
+        .from('v_reporting_data_quality')
+        .select('issue_code,issue_count'),
+      client
+        .from('v_ready_balances')
+        .select('ready_pieces'),
+      client
+        .from('v_wip_balances')
+        .select('wip_pieces'),
+      client
+        .from('v_money_balances')
+        .select('account_id,name,kind,active,balance')
+        .eq('active', true)
     ]);
-    [sales,cogs,returnCogs,returns,collections,fixedExp,allExp,customers,suppliers,dq,ready,wip,inventory]
-      .forEach(x=>{if(x.error)throw x.error;});
-    const f = sales.data||[], h = cogs.data||[], rc=returnCogs.data||[], rr=returns.data||[];
-    const col=(collections.data||[]).filter(x=>inRange(x.collection_date,from,to));
-    const fx=(fixedExp.data||[]).filter(x=>inRange(x.expense_date,from,to));
-    const ex=(allExp.data||[]).filter(x=>inRange(x.expense_date,from,to));
-    const salesInRange=f.filter(x=>inRange(x.invoice_date,from,to));
-    const cogsInRange=h.filter(x=>inRange(x.sale_date,from,to));
-    const returnsInRange=rr.filter(x=>inRange(x.return_date,from,to));
-    const returnCogsInRange=rc.filter(x=>inRange(x.return_date,from,to));
+
+    [daily, models, inventory, customers, suppliers, dq, ready, wip, moneyBalances]
+      .forEach((result) => { if (result.error) throw result.error; });
+
     return {
-      sales:salesInRange,cogs:cogsInRange,returns:returnsInRange,returnCogs:returnCogsInRange,
-      collections:col,fixed:fx,expenses:ex,customers:customers.data||[],suppliers:suppliers.data||[],
-      dq:dq.data||[],ready:ready.data||[],wip:wip.data||[],inventory:inventory.data||[]
+      daily: daily.data || [],
+      models: models.data || [],
+      inventory: inventory.data || [],
+      customers: customers.data || [],
+      suppliers: suppliers.data || [],
+      dq: dq.data || [],
+      ready: ready.data || [],
+      wip: wip.data || [],
+      moneyBalances: moneyBalances.data || []
     };
   }
 
-  function num(rows, key){return rows.reduce((s,r)=>s+Number(r[key]||0),0);}
-
-  async function render(from=monthAgo(),to=today()) {
+  async function render(from = monthAgo(), to = today()) {
     try {
-      const d=await load(from,to);
-      const normal=num(d.sales.filter(x=>x.sale_kind==='normal_sale'),'sales_amount');
-      const clearance=num(d.sales.filter(x=>x.sale_kind==='clearance_sale'),'sales_amount');
-      const redelivery=num(d.sales.filter(x=>x.sale_kind==='return_redelivery'),'sales_amount');
-      const returnCredits=num(d.returns,'financial_credit_amount');
-      const grossSales=normal+clearance+redelivery;
-      const netSales=grossSales-returnCredits;
-      const grossCogs=num(d.cogs,'cogs_amount');
-      const reversedCogs=num(d.returnCogs,'returned_cogs');
-      const netCogs=grossCogs-reversedCogs;
-      const grossMargin=netSales-netCogs;
-      const collected=num(d.collections,'amount');
-      const fixed=num(d.fixed,'amount');
-      const variable=num(d.expenses.filter(x=>x.cost_type==='variable'),'amount');
-      const due=d.customers.reduce((s,x)=>s+Number(x.amount_due||0),0);
-      const credit=d.customers.reduce((s,x)=>s+Number(x.customer_credit||0),0);
-      const supplierDue=d.suppliers.reduce((s,x)=>s+Number(x.payable_balance||0),0);
-      const qualityIssues=d.dq.reduce((s,x)=>s+Number(x.issue_count||0),0);
-      const ready=num(d.ready,'ready_pieces'), wip=num(d.wip,'wip_pieces');
-      const low=d.inventory.filter(x=>x.minimum_stock!=null&&Number(x.current_quantity||0)<=Number(x.minimum_stock)).length;
+      const d = await load(from, to);
 
-      const mix=[
-        ['مبيعات جديدة',normal,'normal_sale'],
-        ['بيع تصفية',clearance,'clearance_sale'],
-        ['إعادة تسليم مرتجع',redelivery,'return_redelivery'],
-        ['ائتمان مرتجعات',-returnCredits,'return_credit']
-      ].map(x=>`<tr><td><b>${x[0]}</b></td><td>${money(x[1])}</td><td>${x[2]}</td></tr>`).join('');
+      const netSales = sum(d.daily, 'net_sales');
+      const grossSales = sum(d.daily, 'gross_sales');
+      const netCogs = sum(d.daily, 'net_cogs');
+      const historicalCogs = sum(d.daily, 'historical_cogs');
+      const returnedCogs = sum(d.daily, 'returned_cogs');
+      const returnCredits = sum(d.daily, 'return_credits');
+      const grossMargin = sum(d.daily, 'gross_margin');
+      const collected = sum(d.daily, 'collections');
+      const fixed = sum(d.daily, 'fixed_expenses');
+      const variable = sum(d.daily, 'variable_expenses');
 
-      const warnings=qualityIssues
-        ? `<div class="panel note-panel" style="margin-bottom:14px"><h3>تنبيه جودة الداتا</h3><p>يوجد ${qty(qualityIssues)} مشكلة في مؤشرات جودة التقارير. لا تعتمد أرقام الربحية حتى تُغلق.</p></div>`
-        : `<div class="panel note-panel" style="margin-bottom:14px"><h3>سلامة طبقة التقارير</h3><p>كل مؤشرات جودة الداتا الحالية = 0.</p></div>`;
+      const customerDue = d.customers.reduce((total, row) => total + Number(row.amount_due || 0), 0);
+      const customerCredit = d.customers.reduce((total, row) => total + Number(row.customer_credit || 0), 0);
+      const supplierDue = d.suppliers.reduce((total, row) => total + Number(row.payable_balance || 0), 0);
+      const cashBank = d.moneyBalances.reduce((total, row) => total + Number(row.balance || 0), 0);
+      const readyPieces = sum(d.ready, 'ready_pieces');
+      const wipPieces = sum(d.wip, 'wip_pieces');
+      const inventoryValue = sum(d.inventory, 'inventory_value');
+      const lowStock = d.inventory.filter(
+        row => row.minimum_stock != null && Number(row.current_quantity || 0) <= Number(row.minimum_stock)
+      ).length;
+      const qualityIssues = sum(d.dq, 'issue_count');
 
-      document.getElementById('view').innerHTML=`
+      const salesMix = [
+        ['مبيعات عادية', sum(d.daily, 'normal_sales'), 'normal_sale'],
+        ['بيع تصفية', sum(d.daily, 'clearance_sales'), 'clearance_sale'],
+        ['إعادة تسليم مرتجع', sum(d.daily, 'return_redelivery_sales'), 'return_redelivery'],
+        ['ائتمانات مرتجعات', -returnCredits, 'return_credit']
+      ].map(([label, amount, kind]) =>
+        '<tr><td><b>' + esc(label) + '</b></td><td>' + money(amount) + '</td><td>' + esc(kind) + '</td></tr>'
+      ).join('');
+
+      const modelMap = new Map();
+      d.models.forEach((row) => {
+        const key = row.model_id;
+        if (!modelMap.has(key)) {
+          modelMap.set(key, {
+            code: row.model_code,
+            name: row.model_name,
+            pieces: 0,
+            sales: 0,
+            cogs: 0
+          });
+        }
+        const item = modelMap.get(key);
+        item.pieces += Number(row.pieces || 0);
+        item.sales += Number(row.sales_amount || 0);
+        item.cogs += Number(row.historical_cogs || 0);
+      });
+      const modelRows = [...modelMap.values()]
+        .sort((a, b) => b.sales - a.sales)
+        .map((row) => '<tr>' +
+          '<td><b>' + esc(row.code) + '</b><br><span class="muted">' + esc(row.name) + '</span></td>' +
+          '<td>' + qty(row.pieces) + '</td>' +
+          '<td>' + money(row.sales) + '</td>' +
+          '<td>' + money(row.cogs) + '</td>' +
+          '<td>' + money(row.sales - row.cogs) + '</td>' +
+          '</tr>'
+        ).join('');
+
+      const inventoryRows = d.inventory
+        .map((row) => {
+          const current = Number(row.current_quantity || 0);
+          const minimum = row.minimum_stock == null ? null : Number(row.minimum_stock);
+          const isLow = minimum != null && current <= minimum;
+          return '<tr>' +
+            '<td><b>' + esc(row.code) + '</b><br><span class="muted">' + esc(row.name) + '</span></td>' +
+            '<td>' + esc(row.kind) + '</td>' +
+            '<td>' + current.toLocaleString('ar-EG') + ' ' + esc(row.unit) + '</td>' +
+            '<td>' + money(row.inventory_value) + '</td>' +
+            '<td>' + (isLow ? '<span class="tag danger">منخفض</span>' : '<span class="tag">طبيعي</span>') + '</td>' +
+          '</tr>';
+        })
+        .join('');
+
+      const dailyRows = d.daily
+        .slice()
+        .reverse()
+        .slice(0, 12)
+        .map((row) => '<tr>' +
+          '<td>' + esc(row.report_date) + '</td>' +
+          '<td>' + money(row.net_sales) + '</td>' +
+          '<td>' + money(row.net_cogs) + '</td>' +
+          '<td>' + money(row.gross_margin) + '</td>' +
+          '<td>' + money(row.collections) + '</td>' +
+        '</tr>')
+        .join('');
+
+      const warnings = qualityIssues
+        ? '<div class="panel note-panel" style="margin-bottom:14px"><h3>تنبيه جودة الداتا</h3><p>يوجد ' + qty(qualityIssues) + ' مشكلة في مؤشرات جودة التقارير. لا تعتمد نتائج التقارير حتى تُغلق.</p></div>'
+        : '<div class="panel note-panel" style="margin-bottom:14px"><h3>سلامة طبقة التقارير</h3><p>كل مؤشرات جودة الداتا الحالية = 0.</p></div>';
+
+      document.getElementById('view').innerHTML = `
         <div class="hero">
-          <div><h2>مركز القرار</h2><p>كل الأرقام أدناه مشتقة من الـReporting Views والحركات الأصلية.</p></div>
+          <div>
+            <h2>مركز القرار</h2>
+            <p>التقارير النهائية مشتقة من Reporting Views والحركات الأصلية فقط.</p>
+          </div>
           <div class="hero-actions"><button class="button secondary" id="applyReportFilter">تحديث الفترة</button></div>
         </div>
+
         <div class="toolbar">
           <label style="flex:1;max-width:240px">من<input id="reportFrom" type="date" value="${from}"></label>
           <label style="flex:1;max-width:240px">إلى<input id="reportTo" type="date" value="${to}"></label>
         </div>
+
         ${warnings}
+
         <div class="stats-grid">
-          ${statCard('↗','صافي المبيعات',money(netSales),`${money(grossSales)} قبل المرتجعات`)}
-          ${statCard('▣','صافي COGS',money(netCogs),`${money(reversedCogs)} عكس تكلفة مرتجعات`)}
-          ${statCard('◆','الهامش الإجمالي',money(grossMargin),'بعد تكلفة البيع التاريخية')}
-          ${statCard('✓','التحصيلات',money(collected),'داخل الفترة')}
+          ${statCard('↗', 'صافي المبيعات', money(netSales), `${money(grossSales)} إجمالي الفواتير قبل ائتمانات المرتجعات`)}
+          ${statCard('▣', 'صافي COGS', money(netCogs), `${money(historicalCogs)} تاريخي - ${money(returnedCogs)} عكس مرتجعات`)}
+          ${statCard('◆', 'الهامش الإجمالي', money(grossMargin), 'صافي المبيعات - صافي COGS')}
+          ${statCard('✓', 'التحصيلات', money(collected), 'داخل الفترة المحددة')}
         </div>
+
         <div class="stats-grid">
-          ${statCard('●','مستحق العملاء',money(due),`${money(credit)} رصيد لصالح العملاء`)}
-          ${statCard('▰','مستحق الموردين',money(supplierDue),'بعد الأرصدة الافتتاحية')}
-          ${statCard('◈','READY',qty(ready),'قطعة')}
-          ${statCard('▤','WIP',qty(wip),'قطعة')}
+          ${statCard('●', 'مستحق العملاء', money(customerDue), `${money(customerCredit)} رصيد لصالح العملاء`)}
+          ${statCard('▰', 'مستحق الموردين', money(supplierDue), 'الرصيد الحالي بعد المردودات والمدفوعات')}
+          ${statCard('◈', 'قيمة المخزون', money(inventoryValue), `${qty(lowStock)} صنف عند/تحت الحد الأدنى`)}
+          ${statCard('▤', 'النقد والبنك', money(cashBank), 'الرصيد الحالي للحسابات النشطة')}
         </div>
+
         <div class="two-col">
-          <div class="panel"><div class="panel-head"><div><h3>تفكيك المبيعات</h3><span>مهم لمنع إعادة التسليم من تضخيم المبيعات الجديدة.</span></div></div>
-            ${table(['البند','القيمة','النوع'],mix,'لا توجد مبيعات في الفترة.')}
+          <div class="panel">
+            <div class="panel-head">
+              <div><h3>تفكيك المبيعات</h3><span>إعادة التسليم والخصومات المالية للمرتجعات تظل واضحة منفصلة.</span></div>
+            </div>
+            ${table(['البند','القيمة','النوع'], salesMix, 'لا توجد حركة مبيعات/مرتجعات في الفترة.')}
           </div>
-          <div class="panel"><h3>التكاليف التشغيلية</h3>
+
+          <div class="panel">
+            <h3>التشغيل الحالي</h3>
+            <div class="report-line"><span>READY</span><b>${qty(readyPieces)} قطعة</b></div>
+            <div class="report-line"><span>WIP</span><b>${qty(wipPieces)} قطعة</b></div>
             <div class="report-line"><span>مصروفات ثابتة</span><b>${money(fixed)}</b></div>
             <div class="report-line"><span>مصروفات متغيرة</span><b>${money(variable)}</b></div>
-            <div class="report-line"><span>مخزون منخفض</span><b>${qty(low)} صنف</b></div>
-            <div class="report-line total"><span>ملاحظة</span><b>صافي الربح النهائي لم يُعتمد بعد</b></div>
+            <div class="report-line total"><span>قاعدة V1</span><b>لا يوجد Net Profit كأساس تقريري</b></div>
           </div>
+        </div>
+
+        <div class="panel" style="margin-top:14px">
+          <div class="panel-head">
+            <div><h3>أداء الموديلات خلال الفترة</h3><span>المبيعات والتكلفة التاريخية الملتقطة لحظة البيع.</span></div>
+          </div>
+          ${table(['الموديل','القطع','المبيعات','التكلفة التاريخية','الفارق الإجمالي'], modelRows, 'لا توجد مبيعات حسب الموديل في الفترة.')}
+        </div>
+
+        <div class="two-col" style="margin-top:14px">
+          <div class="panel">
+            <div class="panel-head"><div><h3>قيمة المخزون الحالي</h3><span>قيمة طبقات المخزون المتبقية، منفصلة عن تكلفة الموديل الحالية.</span></div></div>
+            ${table(['الخامة','النوع','الكمية','القيمة','الحالة'], inventoryRows, 'لا يوجد مخزون حالي.')}
+          </div>
+
+          <div class="panel">
+            <div class="panel-head"><div><h3>المؤشرات اليومية</h3><span>بحسب تاريخ العملية الفعلي، وليس created_at.</span></div></div>
+            ${table(['التاريخ','صافي المبيعات','صافي COGS','الهامش الإجمالي','التحصيلات'], dailyRows, 'لا توجد حركة مالية في الفترة.')}
+          </div>
+        </div>
+
+        <div class="panel" style="margin-top:14px">
+          <h3>مرجع المرتجعات</h3>
+          <div class="report-line"><span>ائتمانات المرتجعات</span><b>${money(returnCredits)}</b></div>
+          <div class="report-line"><span>عكس التكلفة التاريخية</span><b>${money(returnedCogs)}</b></div>
+          <div class="report-line"><span>عدد أنواع مشكلات جودة التقارير</span><b>${qty(qualityIssues)}</b></div>
         </div>
       `;
 
-      document.getElementById('applyReportFilter').onclick=async()=>{
-        const a=document.getElementById('reportFrom').value,b=document.getElementById('reportTo').value;
-        if(!a||!b||a>b){setStatus('راجع الفترة الزمنية.','error');return;}
-        await render(a,b);
+      document.getElementById('applyReportFilter').onclick = async () => {
+        const a = document.getElementById('reportFrom').value;
+        const b = document.getElementById('reportTo').value;
+        if (!a || !b || a > b) {
+          setStatus('راجع الفترة الزمنية.', 'error');
+          return;
+        }
+        await render(a, b);
       };
-    }catch(error){setStatus(`تعذر تحميل التقارير: ${error.message}`,'error');}
+    } catch (error) {
+      setStatus(`تعذر تحميل التقارير: ${error.message}`, 'error');
+    }
   }
 
-  const original=window.reportsView;
-  window.reportsView=()=>render();
-  window.__masna3iOriginalReportsView=original;
-  if(location.hash.replace('#','')==='reports'&&document.getElementById('view'))window.reportsView();
+  const original = window.reportsView;
+  window.reportsView = () => render();
+  window.__masna3iOriginalReportsView = original;
+
+  if (location.hash.replace('#', '') === 'reports' && document.getElementById('view')) {
+    window.reportsView();
+  }
 })();
