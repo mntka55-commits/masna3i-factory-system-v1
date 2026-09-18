@@ -16,7 +16,7 @@
     const results = await Promise.all([
       client.from('models').select('id,code,name,selling_price,sizes,colors,notes').eq('id',state.modelId).limit(1),
       client.from('v_model_current_costs').select('current_cost_per_piece,fabric_cost_per_piece,accessory_cost_per_piece,variable_cost_per_piece,consumed_quantity,actual_pieces').eq('model_id',state.modelId).limit(1),
-      client.from('v_model_material_costs').select('model_material_id,material_id,material_code,material_name,material_kind,unit,quantity_per_piece,source_unit_price,unit_cost_override,effective_unit_price,recipe_cost_per_piece').eq('model_id',state.modelId).order('material_name'),
+      client.from('v_model_material_costs').select('model_material_id,material_id,material_code,material_name,material_kind,unit,quantity_per_piece,source_unit_price,unit_cost_override,effective_unit_price,price_source,recipe_cost_per_piece').eq('model_id',state.modelId).order('material_name'),
       client.from('model_variable_costs').select('id,cost_type,name,amount_per_piece,notes').eq('model_id',state.modelId).order('created_at')
     ]);
     const model = results[0].data && results[0].data[0];
@@ -39,6 +39,7 @@
         '<td>' + (r.source_unit_price == null ? '<span class="status-pill warning">غير متوفر</span>' : moneyLocal(r.source_unit_price)) + '</td>' +
         '<td><input class="inline-input model-material-override" data-id="' + esc(r.model_material_id) + '" type="number" min="0" step="0.0001" value="' + (r.unit_cost_override == null ? '' : Number(r.unit_cost_override)) + '" placeholder="تلقائي" /></td>' +
         '<td>' + (r.effective_unit_price == null ? '—' : moneyLocal(r.effective_unit_price)) + '</td>' +
+        '<td>' + ({owner_override:'Override من Owner',latest_purchase:'آخر فاتورة شراء',warehouse:'قيمة المخزن',unavailable:'غير متاح'}[r.price_source] || '—') + '</td>' +
         '<td>' + (r.recipe_cost_per_piece == null ? '—' : moneyLocal(r.recipe_cost_per_piece)) + '</td>' +
         '<td><button class="table-button model-material-save" data-id="' + esc(r.model_material_id) + '">حفظ</button></td>' +
       '</tr>';
@@ -62,8 +63,8 @@
         '<div class="stat-card"><div class="stat-icon">▤</div><div><span>تكلفة متغيرة</span><strong>' + moneyLocal(variableTotal) + '</strong><small>إضافات Owner لكل قطعة</small></div></div>' +
       '</div>' +
       '<div class="panel"><div class="panel-head"><div><h3>مواد الموديل</h3><span>السعر من آخر فاتورة شراء، وOwner يستطيع اعتماد سعر مختلف.</span></div><button class="button" id="addModelMaterial">＋ إضافة مادة / إكسسوار</button></div>' +
-      '<div class="table-wrap"><table><thead><tr><th>المادة</th><th>الاستهلاك/قطعة</th><th>سعر المصدر</th><th>سعر Owner</th><th>السعر المعتمد</th><th>تكلفة/قطعة</th><th></th></tr></thead><tbody>' +
-      (materialRowsHtml || '<tr><td colspan="7" class="empty-cell">لم تتم إضافة مواد للموديل بعد.</td></tr>') +
+      '<div class="table-wrap"><table><thead><tr><th>المادة</th><th>الاستهلاك/قطعة</th><th>سعر المصدر</th><th>سعر Owner</th><th>السعر المعتمد</th><th>المصدر</th><th>تكلفة/قطعة</th><th></th></tr></thead><tbody>' +
+      (materialRowsHtml || '<tr><td colspan="8" class="empty-cell">لم تتم إضافة مواد للموديل بعد.</td></tr>') +
       '</tbody></table></div></div>' +
       '<div class="panel"><div class="panel-head"><div><h3>تكلفة متغيرة</h3><span>مساحة مرنة لأي إضافة يريدها الـOwner، مثل خياطة أو كي أو تشطيب.</span></div><button class="button" id="addVariableCost">＋ إضافة تكلفة متغيرة</button></div>' +
       '<div class="table-wrap"><table><thead><tr><th>البند</th><th>ج/قطعة</th><th>ملاحظات</th><th></th><th></th></tr></thead><tbody>' +
