@@ -8,12 +8,20 @@
 
   const today = () => new Date().toISOString().slice(0, 10);
   const esc = (v) => String(v ?? '').replace(/[&<>'"]/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#039;','"':'&quot;'}[c]));
-  const outcomeLabel = (x) => ({ good_ready:'سليم → READY', repair:'تحت الإصلاح', scrap:'هالك' }[x] || x || '—');
+  const outcomeLabel = (x) => ({
+    good_ready:'سليم → READY',
+    repair:'تالف → إصلاح',
+    discounted_sale:'تالف → بيع مخفض',
+    scrap:'تالف → إهلاك'
+  }[x] || x || '—');
+  const dispositionLabel = (x) => ({
+    repair:'إصلاح → READY',
+    discounted_sale:'تجهيز للبيع المخفض',
+    scrap:'إهلاك'
+  }[x] || x || '—');
 
   async function load() {
-    const [
-      r1,r2,r3,r4,r5,r6,r7,r8
-    ] = await Promise.all([
+    const [r1,r2,r3,r4,r5,r6,r7,r8,r9] = await Promise.all([
       client.from('returns').select('id,return_number,sale_id,return_date,notes,created_at').order('return_date',{ascending:false}),
       client.from('return_lines').select('id,return_id,sale_line_id,quantity,outcome,financial_credit_amount'),
       client.from('sales').select('id,customer_id,sale_date,sale_kind'),
@@ -24,13 +32,21 @@
       Promise.all([
         client.from('v_return_damage_balances').select('return_damage_lot_id,return_line_id,remaining_pieces').gt('remaining_pieces',0),
         client.from('ready_lots').select('id,source_return_line_id,remaining_pieces').gt('remaining_pieces',0),
-      ])
+      ]),
+      client.from('v_return_damage_dispositions').select('id,return_line_id,disposition,quantity,effective_date,notes').order('effective_date',{ascending:false}).order('created_at',{ascending:false})
     ]);
-    [r1,r2,r3,r4,r5,r6,r7,r8[0],r8[1]].forEach((x)=>{ if(x.error) throw x.error; });
+    [r1,r2,r3,r4,r5,r6,r7,r8[0],r8[1],r9].forEach((x)=>{ if(x.error) throw x.error; });
     return {
-      returns:r1.data||[], lines:r2.data||[], sales:r3.data||[], saleLines:r4.data||[],
-      invoices:r5.data||[], customers:r6.data||[], models:r7.data||[],
-      damage:r8[0].data||[], ready:r8[1].data||[]
+      returns:r1.data||[],
+      lines:r2.data||[],
+      sales:r3.data||[],
+      saleLines:r4.data||[],
+      invoices:r5.data||[],
+      customers:r6.data||[],
+      models:r7.data||[],
+      damage:r8[0].data||[],
+      ready:r8[1].data||[],
+      dispositions:r9.data||[]
     };
   }
 
@@ -69,10 +85,18 @@
       const redelivered=d.saleLines.filter(x=>x.source_return_line_id===line.id).reduce((s,x)=>s+Number(x.quantity||0),0);
       const available=Math.max(0,Number(line.quantity)-redelivered);
       let buttons='';
-      if(pending) buttons+=`<button class="table-button" data-repair="${line.id}">تم التصليح</button> `;
+      if(pending && line.outcome==='repair') buttons+=`<button class="table-button" data-repair="${line.id}">تم التصليح</button> `;
+      if(pending && line.outcome==='discounted_sale') buttons+=`<button class="table-button" data-discount="${line.id}">تجهيز للبيع المخفض</button> `;
+      if(pending && line.outcome==='scrap') buttons+=`<button class="table-button danger" data-scrap="${line.id}">إهلاك</button> `;
       if(readyQty>0 && available>0 && c.customer) buttons+=`<button class="table-button" data-redelivery="${line.id}">إعادة تسليم</button>`;
       return `<div class="activity-row"><span class="dot"></span><div><b>${esc(c.model?.code||'—')} — ${esc(c.model?.name||'')}</b><small>مرتجع ${esc(d.returns.find(r=>r.id===line.return_id)?.return_number||'—')} · ${esc(c.customer?.name||'بدون عميل')}</small></div><strong>${qty(line.quantity)} قطعة</strong><span>${buttons||'<span class="subtext">لا يوجد إجراء</span>'}</span></div>`;
     }).join('') || '<div class="empty-state compact"><b>لا توجد بنود مرتجعات</b><span>سجل أول مرتجع لظهور الإجراءات هنا.</span></div>';
+
+    const dispositionRows=d.dispositions.slice(0,20).map((item)=>{
+      const line=d.lines.find(x=>x.id===item.return_line_id);
+      const r=d.returns.find(x=>x.id===line?.return_id);
+      return `<tr><td><b>${esc(r?.return_number||'—')}</b></td><td>${dispositionLabel(item.disposition)}</td><td>${qty(item.quantity)}</td><td>${esc(item.effective_date||'—')}</td><td>${esc(item.notes||'—')}</td></tr>`;
+    }).join('');
 
     document.getElementById('view').innerHTML=`
       <div class="hero"><div><h2>المرتجعات</h2><p>المرتجع يقلل رصيد العميل ولا يعدل الفاتورة الأصلية بصمت.</p></div><button class="button" id="addReturn">＋ تسجيل مرتجع</button></div>
@@ -82,11 +106,14 @@
         ${statCard('🛠','تحت الإصلاح',qty(repair),'قطعة')}
         ${statCard('◈','READY من مرتجعات',qty(returnReady),'قطعة')}
       </div>
-      <div class="panel note-panel" style="margin-bottom:14px"><h3>قاعدة التشغيل</h3><p>إعادة التسليم تُصدر فاتورة جديدة بنوع <b>return_redelivery</b>، لكنها لا تُحسب كمبيعات جديدة في تقارير الأداء. السعر الافتراضي هو السعر الأصلي ويمكن للمالك تعديله.</p><p>التصفية تُنفذ لاحقًا كـClearance Sale مستقل، وليست نتيجة مرتجع.</p></div>
+      <div class="panel note-panel" style="margin-bottom:14px"><h3>قاعدة التشغيل</h3><p>السليم يعود إلى READY. التالف له 3 قرارات: <b>إصلاح</b> أو <b>بيع مخفض</b> أو <b>إهلاك</b>.</p><p>البيع المخفض يُجهز في READY من مصدر المرتجع، لكن <b>البيع العادي لا يسحب هذه القطع</b>؛ بيعها يتم عبر Clearance Sale.</p><p>إعادة التسليم تُصدر فاتورة جديدة بنوع <b>return_redelivery</b>، والتصفية تظل SALE مستقلة.</p></div>
       <div class="panel">${table(['المرتجع / الفاتورة','التاريخ','العميل','التفاصيل','رصيد العميل'],rows,'لا توجد مرتجعات مسجلة حتى الآن.')}</div>
-      <div class="panel" style="margin-top:14px"><div class="panel-head"><div><h3>الإجراءات</h3><span>إتمام الإصلاح أو إعادة التسليم من مصدر المرتجع نفسه.</span></div></div>${actions}</div>`;
+      <div class="panel" style="margin-top:14px"><div class="panel-head"><div><h3>الإجراءات</h3><span>إتمام قرار المرتجع من نفس المصدر وبحركة قابلة للتتبع.</span></div></div>${actions}</div>
+      <div class="panel" style="margin-top:14px"><div class="panel-head"><div><h3>سجل قرارات المرتجعات</h3><span>آخر إجراءات الإصلاح والبيع المخفض والإهلاك.</span></div></div>${table(['المرتجع','القرار','الكمية','التاريخ','ملاحظة'],dispositionRows,'لا توجد قرارات disposition مسجلة بعد.')}</div>`;
     document.getElementById('addReturn').onclick=()=>openReturn(d);
     document.querySelectorAll('[data-repair]').forEach(b=>b.onclick=()=>repair(d,b.dataset.repair));
+    document.querySelectorAll('[data-discount]').forEach(b=>b.onclick=()=>prepareDiscountedSale(d,b.dataset.discount));
+    document.querySelectorAll('[data-scrap]').forEach(b=>b.onclick=()=>scrap(d,b.dataset.scrap));
     document.querySelectorAll('[data-redelivery]').forEach(b=>b.onclick=()=>redelivery(d,b.dataset.redelivery));
   }
 
@@ -99,8 +126,9 @@
           <label>الفاتورة<select id="returnInvoice" required><option value="">اختر الفاتورة</option>${invoices.map(i=>`<option value="${esc(i.sale_id)}">${esc(i.invoice_number)}</option>`).join('')}</select></label>
           <div id="returnLines" class="allocation-box"><div class="allocation-empty">اختر الفاتورة.</div></div>
           <label>الكمية<input id="returnQty" type="number" min="1" step="1" disabled required></label>
-          <label>النتيجة<select id="returnOutcome"><option value="good_ready">سليم — READY</option><option value="repair">تحت الإصلاح</option></select></label>
+          <label>النتيجة<select id="returnOutcome"><option value="good_ready">سليم — READY</option><option value="repair">تالف — إصلاح</option><option value="discounted_sale">تالف — بيع مخفض</option><option value="scrap">تالف — إهلاك</option></select></label>
           <label>ملاحظات<input id="returnNotes" maxlength="300" placeholder="اختياري"></label>
+          <div class="panel note-panel compact"><p>البيع المخفض يجهز القطعة للبيع عبر Clearance Sale فقط. الإهلاك يغلق القطعة كقرار نهائي.</p></div>
           <div id="returnStatus" class="global-status"></div>
           <div class="modal-actions"><button type="button" class="button secondary" id="cancelReturn">إلغاء</button><button class="button" id="saveReturn" type="submit">حفظ المرتجع</button></div>
         </form>
@@ -171,6 +199,44 @@
       try{const {error}=await client.rpc('post_return_repair_to_ready',{p_return_line_id:id,p_pieces:n});if(error)throw error;close();setStatus(`تم نقل ${qty(n)} قطعة إلى READY.`,'info');await renderRoute(true);}
       catch(err){s.textContent=`تعذر إتمام الإصلاح: ${err.message}`;b.disabled=false;}
     };
+  }
+
+  function prepareDiscountedSale(d,id){
+    const damage=d.damage.find(x=>x.return_line_id===id);if(!damage)return;
+    document.body.insertAdjacentHTML('beforeend',`
+      <div class="modal-backdrop" id="discountModal"><div class="modal-card"><div class="modal-head"><div><h3>تجهيز للبيع المخفض</h3><span>ينتقل إلى READY ويُباع لاحقًا عبر Clearance Sale فقط.</span></div><button class="modal-close" id="closeDiscount">×</button></div>
+      <form id="discountForm" class="stack-form"><label>الكمية<input id="discountQty" type="number" min="1" max="${Number(damage.remaining_pieces)}" value="${Number(damage.remaining_pieces)}" required></label><label>ملاحظة<input id="discountNotes" maxlength="300" placeholder="اختياري"></label><div id="discountStatus" class="global-status"></div>
+      <div class="modal-actions"><button type="button" class="button secondary" id="cancelDiscount">إلغاء</button><button class="button" type="submit" id="saveDiscount">تجهيز للبيع المخفض</button></div></form></div></div>`);
+    const modal=document.getElementById('discountModal'),close=()=>modal?.remove();
+    document.getElementById('closeDiscount').onclick=close;document.getElementById('cancelDiscount').onclick=close;
+    modal.addEventListener('click',e=>{if(e.target===modal)close();});
+    document.getElementById('discountForm').onsubmit=async e=>{
+      e.preventDefault();
+      const n=Number(document.getElementById('discountQty').value||0);
+      if(!Number.isInteger(n)||n<=0||n>Number(damage.remaining_pieces))return;
+      const b=document.getElementById('saveDiscount'),s=document.getElementById('discountStatus');b.disabled=true;s.textContent='جارٍ تجهيز القطع…';
+      try{
+        const {error}=await client.rpc('post_return_damage_to_discounted_sale',{
+          p_return_line_id:id,p_pieces:n,p_notes:document.getElementById('discountNotes').value.trim()||null
+        });
+        if(error)throw error;
+        close();setStatus(`تم تجهيز ${qty(n)} قطعة للبيع المخفض. استخدم Clearance Sale لإتمام البيع.`,'info');await renderRoute(true);
+      }catch(err){s.textContent=`تعذر تجهيز البيع المخفض: ${err.message}`;b.disabled=false;}
+    };
+  }
+
+  function scrap(d,id){
+    const damage=d.damage.find(x=>x.return_line_id===id);if(!damage)return;
+    const n=Number(damage.remaining_pieces||0);
+    if(!n)return;
+    if(!window.confirm(`إهلاك ${n} قطعة؟ هذا قرار نهائي لهذه الكمية.`))return;
+    client.rpc('post_return_damage_to_scrap',{p_return_line_id:id,p_pieces:n,p_notes:'إهلاك مرتجع'})
+      .then(({error})=>{
+        if(error)throw error;
+        setStatus(`تم إهلاك ${qty(n)} قطعة وتسجيل القرار.`,'info');
+        return renderRoute(true);
+      })
+      .catch(err=>setStatus(`تعذر تنفيذ الإهلاك: ${err.message}`,'error'));
   }
 
   function redelivery(d,id){
