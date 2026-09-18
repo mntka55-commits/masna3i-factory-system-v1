@@ -24,3 +24,21 @@ async function printInvoice(id){
 }
 window.__printMasna3iInvoice=printInvoice;
 })();
+async function invoicesViewPrintV1(){
+ const [b,i,s,c]=await Promise.all([
+  client.from('v_invoice_balances').select('invoice_id,invoice_number,invoice_date,invoice_total,collected_total,outstanding_total,sale_kind').order('invoice_date',{ascending:false}),
+  client.from('invoices').select('id,sale_id'),
+  client.from('sales').select('id,customer_id,external_customer_name'),
+  client.from('customers').select('id,name')
+ ]);
+ if(b.error)throw b.error;if(i.error)throw i.error;if(s.error)throw s.error;
+ const rows=(b.data||[]).map(r=>{
+  const inv=(i.data||[]).find(x=>x.id===r.invoice_id); const sale=inv?(s.data||[]).find(x=>x.id===inv.sale_id):null;
+  const customer=sale?.external_customer_name||((c.data||[]).find(x=>x.id===sale?.customer_id)?.name)||'—';
+  const kind=r.sale_kind==='clearance_sale'?'تصفية':r.sale_kind==='return_redelivery'?'إعادة تسليم مرتجع':'عادي';
+  return '<tr><td>'+esc(r.invoice_number)+'</td><td>'+esc(customer)+'</td><td>'+kind+'</td><td>'+money(r.invoice_total)+'</td><td>'+money(r.collected_total)+'</td><td>'+money(r.outstanding_total)+'</td><td><button class="table-button" data-print-invoice="'+esc(r.invoice_id)+'">عرض / طباعة</button></td></tr>';
+ }).join('');
+ document.getElementById('view').innerHTML='<div class="hero"><div><h2>الفواتير</h2><p>عرض وطباعة وإعادة طباعة الفاتورة من نفس البيانات المسجلة.</p></div></div><div class="panel"><div class="table-wrap"><table><thead><tr><th>رقم</th><th>العميل</th><th>النوع</th><th>الإجمالي</th><th>المحصل</th><th>المتبقي</th><th></th></tr></thead><tbody>'+(rows||'<tr><td colspan="7">لا توجد فواتير.</td></tr>')+'</tbody></table></div></div>';
+ document.querySelectorAll('[data-print-invoice]').forEach(x=>x.onclick=()=>printInvoice(x.dataset.printInvoice));
+}
+window.invoicesView=invoicesViewPrintV1;
