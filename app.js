@@ -301,10 +301,11 @@ async function collectionsView() {
               <input id="collectionAmount" type="number" min="0.01" step="0.01" required placeholder="مثال: 300" />
             </label>
             <label>الحساب
-              <select id="collectionAccount" required>
-                <option value="">اختر النقدية / البنك</option>
+              <select id="collectionAccount" required ${activeAccounts.length ? '' : 'disabled'}>
+                <option value="">${activeAccounts.length ? 'اختر النقدية / البنك' : 'لا يوجد حساب نشط'}</option>
                 ${accountOptions}
               </select>
+              ${activeAccounts.length ? '' : '<small class="field-help">أنشئ حساب نقدية/بنك من شاشة الحسابات أولًا.</small>'}
             </label>
             <label>تاريخ التحصيل
               <input id="collectionDate" type="date" value="${today}" required />
