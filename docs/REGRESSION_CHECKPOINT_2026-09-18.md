@@ -76,3 +76,23 @@ A direct anonymous Data API call could not be executed from this environment bec
 - No silent business-rule changes.
 - No demo/test data remains in production.
 - Fix from source, then retest.
+
+
+## Damaged return V1 completion added after regression
+- return_damage_dispositions audit table + view added.
+- Repair → READY: PASS.
+- Damaged → discounted sale preparation: PASS.
+- Normal Sale guard against discounted-return READY: PASS.
+- Clearance Sale can consume discounted-return READY: PASS.
+- Scrap disposition: PASS.
+- return_damage_lots factory scope backfilled and enforced with trigger + NOT NULL.
+- Returns UI now exposes Good / Repair / Discounted Sale / Scrap and shows disposition history.
+
+## Additional baseline verification after damaged-return work
+- Invoice 123 remains 600 EGP total, 0 collected, 600 outstanding.
+- PUR-001 remains 2000 EGP total, 0 paid, 2000 remaining, 0 returned.
+- READY remains 4 pieces.
+- WIP remains 4 pieces.
+- Temporary return/disposition/discount-ready rows: 0.
+- Null factory_id return_damage_lots: 0.
+- Reporting data-quality issues: 0.
