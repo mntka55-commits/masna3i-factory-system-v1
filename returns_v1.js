@@ -8,7 +8,7 @@
 
   const today = () => new Date().toISOString().slice(0, 10);
   const esc = (v) => String(v ?? '').replace(/[&<>'"]/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#039;','"':'&quot;'}[c]));
-  const outcomeLabel = (x) => ({ good_ready:'سليم → READY', repair:'تحت الإصلاح', scrap:'هالك' }[x] || x || '—');
+  const outcomeLabel = (x) => ({ good_ready:'سليم → READY', repair:'تحت الإصلاح' }[x] || x || '—');
 
   async function load() {
     const [
