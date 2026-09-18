@@ -241,10 +241,146 @@ async function invoicesView() {
 }
 
 async function collectionsView() {
-  const rows = await fetchOne('collections', 'collection_date,account_id,amount,reference,created_at');
-  const accounts = await fetchOne('money_accounts', 'id,name');
-  const tr = rows.map((r) => `<tr><td>${escapeHtml(r.collection_date || r.created_at?.slice(0,10))}</td><td>${escapeHtml(accounts.find((a)=>a.id===r.account_id)?.name || '—')}</td><td>${money(r.amount)}</td><td>${escapeHtml(r.reference || '—')}</td></tr>`);
-  document.getElementById('view').innerHTML = `<div class="hero"><div><h2>التحصيلات</h2><p>التحصيل مستقل عن إنشاء الفاتورة ويمكن أن يكون على دفعات متعددة.</p></div><button class="button">＋ تسجيل تحصيل</button></div><div class="panel">${table(['التاريخ','الحساب','القيمة','المرجع'], tr, 'لا توجد تحصيلات حتى الآن.')}</div>`;
+  const [balances, collections, accounts, customers] = await Promise.all([
+    fetchOne('v_invoice_balances', 'invoice_id,invoice_number,invoice_date,customer_id,invoice_total,collected_total,outstanding_total'),
+    fetchOne('collections', 'id,collection_date,account_id,amount,reference,created_at'),
+    fetchOne('money_accounts', 'id,name,kind,active'),
+    fetchOne('customers', 'id,name'),
+  ]);
+
+  const openInvoices = balances.filter((r) => Number(r.outstanding_total || 0) > 0);
+  const totalOutstanding = openInvoices.reduce((s, r) => s + Number(r.outstanding_total || 0), 0);
+  const totalCollected = collections.reduce((s, r) => s + Number(r.amount || 0), 0);
+  const activeAccounts = accounts.filter((a) => a.active);
+
+  const rows = collections
+    .slice()
+    .sort((a, b) => String(b.collection_date || b.created_at || '').localeCompare(String(a.collection_date || a.created_at || '')))
+    .map((r) => {
+      const invoice = balances.find((x) => Number(x.collected_total || 0) > 0 && x.invoice_id === r.invoice_id);
+      return `<tr><td>${escapeHtml(r.collection_date || r.created_at?.slice(0,10) || '—')}</td><td>${escapeHtml(r.reference || '—')}</td><td>${escapeHtml(accounts.find((a) => a.id === r.account_id)?.name || '—')}</td><td><b>${money(r.amount)}</b></td><td><span class="status-pill ok">مسجل</span></td></tr>`;
+    });
+
+  document.getElementById('view').innerHTML = `
+    <div class="hero">
+      <div><h2>التحصيلات</h2><p>التحصيل مستقل عن إنشاء الفاتورة، ويمكن تسجيله على دفعات متعددة حتى إغلاق المستحق.</p></div>
+      <button class="button" id="openCollectionForm">＋ تسجيل تحصيل</button>
+    </div>
+    <div class="stats-grid">
+      ${statCard('▣', 'المستحق من الفواتير', money(totalOutstanding), `${qty(openInvoices.length)} فاتورة مفتوحة`)}
+      ${statCard('✓', 'إجمالي التحصيلات', money(totalCollected), 'حركات فعلية مسجلة')}
+      ${statCard('●', 'حسابات نقدية/بنك', qty(activeAccounts.length), 'متاحة للتحصيل')}
+      ${statCard('↗', 'الفواتير القابلة للتحصيل', qty(openInvoices.length), 'المتبقي أكبر من صفر')}
+    </div>
+    <div class="panel collection-panel">
+      <div class="panel-head"><div><h3>حركات التحصيل</h3><span>كل حركة مرتبطة بحساب نقدي/بنكي ولا تنشئ فاتورة جديدة.</span></div></div>
+      ${table(['التاريخ','المرجع','الحساب','القيمة','الحالة'], rows, 'لا توجد تحصيلات حتى الآن.')}
+    </div>
+  `;
+
+  const openForm = () => {
+    const today = new Date().toISOString().slice(0, 10);
+    const invoiceOptions = openInvoices.map((r) =>
+      `<option value="${escapeHtml(r.invoice_id)}" data-number="${escapeHtml(r.invoice_number)}" data-max="${Number(r.outstanding_total || 0)}">${escapeHtml(r.invoice_number)} — ${escapeHtml(customers.find((c) => c.id === r.customer_id)?.name || 'بدون عميل')} — متبقي ${money(r.outstanding_total)}</option>`
+    ).join('');
+    const accountOptions = activeAccounts.map((a) => `<option value="${escapeHtml(a.id)}">${escapeHtml(a.name)} — ${escapeHtml(a.kind || '')}</option>`).join('');
+
+    document.body.insertAdjacentHTML('beforeend', `
+      <div class="modal-backdrop" id="collectionModal">
+        <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="collectionTitle">
+          <div class="modal-head"><div><h3 id="collectionTitle">تسجيل تحصيل</h3><span>لا يمكن تجاوز المستحق على الفاتورة.</span></div><button class="modal-close" id="closeCollectionModal">×</button></div>
+          <form id="collectionForm" class="stack-form">
+            <label>الفاتورة
+              <select id="collectionInvoice" required>
+                <option value="">اختر الفاتورة</option>
+                ${invoiceOptions}
+              </select>
+              <small class="field-help" id="collectionOutstanding">اختر فاتورة لمعرفة الحد الأقصى للتحصيل.</small>
+            </label>
+            <label>مبلغ التحصيل
+              <input id="collectionAmount" type="number" min="0.01" step="0.01" required placeholder="مثال: 300" />
+            </label>
+            <label>الحساب
+              <select id="collectionAccount" required>
+                <option value="">اختر النقدية / البنك</option>
+                ${accountOptions}
+              </select>
+            </label>
+            <label>تاريخ التحصيل
+              <input id="collectionDate" type="date" value="${today}" required />
+            </label>
+            <label>المرجع
+              <input id="collectionReference" maxlength="120" placeholder="رقم إيصال / تحويل (اختياري)" />
+            </label>
+            <label>ملاحظات
+              <input id="collectionNotes" maxlength="300" placeholder="ملاحظات (اختياري)" />
+            </label>
+            <div class="modal-actions"><button type="button" class="button secondary" id="cancelCollection">إلغاء</button><button type="submit" class="button" id="saveCollection">حفظ التحصيل</button></div>
+            <div class="global-status" id="collectionStatus"></div>
+          </form>
+        </div>
+      </div>
+    `);
+
+    const modal = document.getElementById('collectionModal');
+    const invoiceSelect = document.getElementById('collectionInvoice');
+    const amountInput = document.getElementById('collectionAmount');
+    const outstandingHelp = document.getElementById('collectionOutstanding');
+    const close = () => modal?.remove();
+
+    const syncLimit = () => {
+      const option = invoiceSelect.options[invoiceSelect.selectedIndex];
+      const max = Number(option?.dataset?.max || 0);
+      amountInput.max = max > 0 ? String(max) : '';
+      outstandingHelp.textContent = max > 0 ? `المتاح للتحصيل: ${money(max)}` : 'اختر فاتورة لمعرفة الحد الأقصى للتحصيل.';
+      if (Number(amountInput.value || 0) > max && max > 0) amountInput.value = String(max);
+    };
+
+    invoiceSelect.addEventListener('change', syncLimit);
+    document.getElementById('closeCollectionModal').onclick = close;
+    document.getElementById('cancelCollection').onclick = close;
+    modal.addEventListener('click', (e) => { if (e.target === modal) close(); });
+
+    document.getElementById('collectionForm').addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const status = document.getElementById('collectionStatus');
+      const option = invoiceSelect.options[invoiceSelect.selectedIndex];
+      const invoiceNumber = option?.dataset?.number || '';
+      const amount = Number(amountInput.value || 0);
+      const max = Number(option?.dataset?.max || 0);
+      if (!invoiceNumber) return status.textContent = 'اختر الفاتورة أولًا.';
+      if (amount <= 0) return status.textContent = 'مبلغ التحصيل يجب أن يكون أكبر من صفر.';
+      if (amount > max) return status.textContent = `المبلغ يتجاوز المستحق. الحد الأقصى: ${money(max)}`;
+      if (!document.getElementById('collectionAccount').value) return status.textContent = 'اختر الحساب النقدي/البنكي.';
+
+      const button = document.getElementById('saveCollection');
+      button.disabled = true;
+      button.textContent = 'جارٍ الحفظ…';
+      status.textContent = '';
+
+      const { error } = await client.rpc('post_collection', {
+        p_invoice_number: invoiceNumber,
+        p_amount: amount,
+        p_collection_date: document.getElementById('collectionDate').value,
+        p_account_id: document.getElementById('collectionAccount').value,
+        p_reference: document.getElementById('collectionReference').value.trim() || null,
+        p_notes: document.getElementById('collectionNotes').value.trim() || null,
+      });
+
+      if (error) {
+        status.textContent = `تعذر تسجيل التحصيل: ${error.message}`;
+        button.disabled = false;
+        button.textContent = 'حفظ التحصيل';
+        return;
+      }
+
+      close();
+      setStatus('تم تسجيل التحصيل وتحديث رصيد الفاتورة والحساب.', 'info');
+      await renderRoute(true);
+    });
+  };
+
+  document.getElementById('openCollectionForm').onclick = openForm;
 }
 
 async function returnsView() {
