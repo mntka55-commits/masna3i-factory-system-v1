@@ -410,13 +410,87 @@ async function accountsView() {
     fetchOne('suppliers', 'id,name'),
     fetchOne('customers', 'id,code,name,phone,address'),
   ]);
+
   const customerDue = invoiceBalances.reduce((s,r)=>s+Number(r.outstanding_total||0),0);
   const supplierDue = purchaseBalances.reduce((s,r)=>s+Number(r.remaining_amount||0),0);
   const expenseTotal = expenses.reduce((s,r)=>s+Number(r.amount||0),0);
   const cash = moneyBalances.reduce((s,r)=>s+Number(r.balance||0),0);
-  document.getElementById('view').innerHTML = `<div class="hero"><div><h2>الحسابات</h2><p>العملاء والموردون والمصروفات والنقدية.</p></div></div><div class="stats-grid">${statCard('●','رصيد العملاء',money(customerDue),`${qty(customers.length)} عميل`)}${statCard('▰','رصيد الموردين',money(supplierDue),`${qty(suppliers.length)} مورد`)}${statCard('▥','مصروفات مسجلة',money(expenseTotal),'من الحركات الأصلية')}${statCard('▣','النقدية والبنك',money(cash),'من أرصدة الحسابات')}</div><div class="two-col"><div class="panel"><div class="panel-head"><div><h3>العملاء</h3><span>بيانات العملاء المستخدمة في فواتير البيع والتحصيلات.</span></div><button class="button secondary" data-add-customer>＋ إضافة عميل</button></div>${table(['الكود','اسم العميل','الهاتف','العنوان'], customers.map(c=>`<tr><td><b>${escapeHtml(c.code || '—')}</b></td><td>${escapeHtml(c.name)}</td><td>${escapeHtml(c.phone || '—')}</td><td>${escapeHtml(c.address || '—')}</td></tr>`), 'لا يوجد عملاء مسجلون حتى الآن.')}</div><div class="panel"><div class="panel-head"><div><h3>الموردون</h3><span>بيانات الموردين المستخدمة في المشتريات ومدفوعاتهم.</span></div><button class="button secondary" data-add-supplier>＋ إضافة مورد</button></div>${table(['اسم المورد','الهاتف','ملاحظات'], suppliers.map(s=>`<tr><td><b>${escapeHtml(s.name)}</b></td><td>${escapeHtml(s.phone || '—')}</td><td>${escapeHtml(s.notes || '—')}</td></tr>`), 'لا يوجد موردون مسجلون حتى الآن.')}</div></div><div class="two-col"><div class="panel"><h3>سداد الموردين</h3><p class="muted">مدفوعات الموردين مسار مستقل عن الشراء وتؤثر في رصيد المورد والنقدية.</p><button class="button secondary">＋ تسجيل دفعة مورد</button></div><div class="panel"><div class="panel-head"><div><h3>المصروفات</h3><span>المصروفات منفصلة عن تكاليف الإنتاج المتغيرة.</span></div><button class="button secondary">＋ إضافة مصروف</button></div></div></div>`;
-}
 
+  const accountRows = moneyBalances.map(a =>
+    `<tr><td><b>${escapeHtml(a.name)}</b></td><td>${escapeHtml(a.kind === 'cash' ? 'نقدية' : a.kind === 'bank' ? 'بنك' : a.kind || '—')}</td><td>${money(a.balance)}</td><td><span class="status-pill ok">نشط</span></td></tr>`
+  );
+
+  document.getElementById('view').innerHTML = `
+    <div class="hero"><div><h2>الحسابات</h2><p>العملاء والموردون والنقدية والمصروفات.</p></div></div>
+    <div class="stats-grid">
+      ${statCard('●','رصيد العملاء',money(customerDue),`${qty(customers.length)} عميل`)}
+      ${statCard('▰','رصيد الموردين',money(supplierDue),`${qty(suppliers.length)} مورد`)}
+      ${statCard('▥','مصروفات مسجلة',money(expenseTotal),'من الحركات الأصلية')}
+      ${statCard('▣','النقدية والبنك',money(cash),`${qty(moneyBalances.length)} حساب`)}
+    </div>
+
+    <div class="panel">
+      <div class="panel-head">
+        <div><h3>حسابات النقدية والبنك</h3><span>الحسابات التي تستخدمها التحصيلات ومدفوعات الموردين والمصروفات.</span></div>
+        <button class="button" id="openMoneyAccountForm">＋ إضافة حساب</button>
+      </div>
+      ${table(['اسم الحساب','النوع','الرصيد الحالي','الحالة'], accountRows, 'لا توجد حسابات نقدية أو بنكية بعد.')}
+    </div>
+
+    <div class="two-col">
+      <div class="panel"><div class="panel-head"><div><h3>العملاء</h3><span>بيانات العملاء المستخدمة في الفواتير والتحصيلات.</span></div><button class="button secondary" data-add-customer>＋ إضافة عميل</button></div>${table(['الكود','اسم العميل','الهاتف','العنوان'], customers.map(c=>`<tr><td><b>${escapeHtml(c.code || '—')}</b></td><td>${escapeHtml(c.name)}</td><td>${escapeHtml(c.phone || '—')}</td><td>${escapeHtml(c.address || '—')}</td></tr>`), 'لا يوجد عملاء مسجلون حتى الآن.')}</div>
+      <div class="panel"><div class="panel-head"><div><h3>الموردون</h3><span>بيانات الموردين المستخدمة في المشتريات والمدفوعات.</span></div><button class="button secondary" data-add-supplier>＋ إضافة مورد</button></div>${table(['اسم المورد','الهاتف','ملاحظات'], suppliers.map(s=>`<tr><td><b>${escapeHtml(s.name)}</b></td><td>${escapeHtml(s.phone || '—')}</td><td>${escapeHtml(s.notes || '—')}</td></tr>`), 'لا يوجد موردون مسجلون حتى الآن.')}</div>
+    </div>
+
+    <div class="two-col">
+      <div class="panel"><h3>سداد الموردين</h3><p class="muted">مسار مستقل عن الشراء ويؤثر على رصيد المورد والنقدية.</p><button class="button secondary" data-nav="accounts">إعداد الحساب ثم المتابعة</button></div>
+      <div class="panel"><h3>المصروفات</h3><p class="muted">المصروفات منفصلة عن تكلفة الموديل التشغيلية.</p><button class="button secondary" data-nav="accounts">سيتم إكمالها بعد قفل التحصيلات والمدفوعات</button></div>
+    </div>
+  `;
+
+  document.getElementById('openMoneyAccountForm').onclick = () => {
+    document.body.insertAdjacentHTML('beforeend', `
+      <div class="modal-backdrop" id="moneyAccountModal">
+        <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="moneyAccountTitle">
+          <div class="modal-head"><div><h3 id="moneyAccountTitle">إضافة حساب نقدية / بنك</h3><span>الحساب يبدأ برصيد صفر؛ الرصيد الافتتاحي له مسار منفصل.</span></div><button class="modal-close" id="closeMoneyAccount">×</button></div>
+          <form id="moneyAccountForm" class="stack-form">
+            <label>اسم الحساب<input id="moneyAccountName" required maxlength="120" placeholder="مثال: خزينة المصنع" /></label>
+            <label>النوع<select id="moneyAccountKind" required><option value="cash">نقدية</option><option value="bank">بنك</option></select></label>
+            <div class="modal-actions"><button type="button" class="button secondary" id="cancelMoneyAccount">إلغاء</button><button type="submit" class="button" id="saveMoneyAccount">حفظ الحساب</button></div>
+            <div class="global-status" id="moneyAccountStatus"></div>
+          </form>
+        </div>
+      </div>
+    `);
+    const modal=document.getElementById('moneyAccountModal');
+    const close=()=>modal?.remove();
+    document.getElementById('closeMoneyAccount').onclick=close;
+    document.getElementById('cancelMoneyAccount').onclick=close;
+    modal.addEventListener('click',(e)=>{if(e.target===modal)close();});
+    document.getElementById('moneyAccountForm').addEventListener('submit',async(e)=>{
+      e.preventDefault();
+      const status=document.getElementById('moneyAccountStatus');
+      const button=document.getElementById('saveMoneyAccount');
+      const name=document.getElementById('moneyAccountName').value.trim();
+      const kind=document.getElementById('moneyAccountKind').value;
+      if(!name) return;
+      button.disabled=true;
+      button.textContent='جارٍ الحفظ…';
+      const {error}=await client.from('money_accounts').insert({name,kind,active:true});
+      if(error){
+        status.textContent=`تعذر إنشاء الحساب: ${error.message}`;
+        button.disabled=false;
+        button.textContent='حفظ الحساب';
+        return;
+      }
+      close();
+      setStatus('تم إنشاء حساب النقدية/البنك.', 'info');
+      await renderRoute(true);
+    });
+  };
+
+  bindInnerNav();
+}
 async function reportsView() {
   const [invoices, collections, ready, wip, fixed, variable] = await Promise.all([
     fetchOne('v_invoice_totals', 'invoice_total'),
