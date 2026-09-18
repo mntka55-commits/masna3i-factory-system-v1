@@ -51,7 +51,24 @@
           <label>رقم الفاتورة<input id="saleInvoice" required maxlength="80" placeholder="مثال: INV-001" /></label>
           <label>تاريخ البيع<input id="saleDate" type="date" value="${today()}" required /></label>
         </div>
-        <div class="form-grid"><label>العميل (اختياري)<select id="saleCustomer"><option value="">بدون عميل محدد</option>${optionsCustomers}</select></label><div style="display:flex;align-items:end"><button type="button" class="button secondary" id="addCustomerFromSale">＋ إضافة عميل</button></div></div>
+        <div class="form-grid">
+    <label>نوع العميل
+      <select id="saleCustomerType">
+        <option value="registered">عميل مسجل</option>
+        <option value="external">عميل خارجي</option>
+      </select>
+    </label>
+    <div id="registeredCustomerWrap" style="display:flex;gap:10px;align-items:end">
+      <label style="flex:1">العميل
+        <select id="saleCustomer"><option value="">بدون عميل محدد</option>${optionsCustomers}</select>
+      </label>
+      <button type="button" class="button secondary" id="addCustomerFromSale">＋ إضافة عميل</button>
+    </div>
+    <label id="externalCustomerWrap" style="display:none">اسم العميل الخارجي
+      <input id="externalCustomerName" maxlength="160" placeholder="اكتب اسم العميل على الفاتورة" />
+      <small class="field-help">لن يتم إنشاء حساب عميل تلقائيًا.</small>
+    </label>
+  </div>
         <div class="panel-subhead"><div><h4>بنود البيع</h4><span>كل بند يُخصم من READY عند التسجيل.</span></div><button type="button" class="button secondary" id="addSaleLine">＋ إضافة موديل</button></div>
         <div id="saleLines">${lineTemplate(ready, 0)}</div>
         <label>ملاحظات<textarea id="saleNotes" rows="2" placeholder="اختياري"></textarea></label>
@@ -62,6 +79,17 @@
     document.body.appendChild(modal);
 
     const close = () => modal.remove();
+    const customerType = modal.querySelector('#saleCustomerType');
+    const registeredWrap = modal.querySelector('#registeredCustomerWrap');
+    const externalWrap = modal.querySelector('#externalCustomerWrap');
+    const syncCustomerType = () => {
+      const external = customerType.value === 'external';
+      registeredWrap.style.display = external ? 'none' : 'flex';
+      externalWrap.style.display = external ? 'block' : 'none';
+    };
+    customerType.addEventListener('change', syncCustomerType);
+    syncCustomerType();
+
     modal.querySelector('#addCustomerFromSale').onclick = () => {
       if (window.__openCustomerModal) window.__openCustomerModal();
     };
@@ -105,11 +133,17 @@
         if (pItems.some((x) => !x.model_id || !Number.isInteger(x.quantity) || x.quantity <= 0 || !Number.isFinite(x.unit_price) || x.unit_price < 0)) {
           throw new Error('راجع الموديل والكمية وسعر البيع في كل بند.');
         }
-        const { data, error } = await client.rpc('post_sale_and_invoice', {
+        const external = customerType.value === 'external';
+        const externalName = modal.querySelector('#externalCustomerName').value.trim();
+        if (external && !externalName) throw new Error('اكتب اسم العميل الخارجي.');
+        const registeredCustomerId = external ? null : (modal.querySelector('#saleCustomer').value || null);
+
+        const { data, error } = await client.rpc('post_sale_and_invoice_v2', {
           p_invoice_number: modal.querySelector('#saleInvoice').value.trim(),
           p_sale_date: modal.querySelector('#saleDate').value,
           p_items: pItems,
-          p_customer_id: modal.querySelector('#saleCustomer').value || null,
+          p_customer_id: registeredCustomerId,
+          p_external_customer_name: external ? externalName : null,
           p_notes: modal.querySelector('#saleNotes').value.trim() || null,
         });
         if (error) throw error;
