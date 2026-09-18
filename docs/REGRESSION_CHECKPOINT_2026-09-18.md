@@ -89,3 +89,12 @@ No test data remains from the reverted work.
 - Return redelivery is shown separately for visibility but is excluded from sales-performance totals, net sales, COGS, and gross margin.
 - Clearance sale remains a separate `clearance_sale` operation.
 - The Returns UI no longer contains any legacy Scrap outcome label.
+
+## Latest alignment verification — 2026-09-18
+- The stale three-outcome return implementation remains reverted.
+- Database constraint return_lines_v1_outcome_check rejects legacy discounted_sale / scrap outcomes; no return data exists in production baseline.
+- Legacy disposition table/view remain absent.
+- Return redelivery remains a separate return_redelivery invoice and is excluded from sales-performance totals, model sales performance, historical COGS, and gross margin; it remains visible as a separate report field.
+- Regression test passed with a temporary redelivery invoice: return_redelivery_sales=1000 while gross/net sales, COGS, and gross margin remained 0; temporary rows were removed.
+- Regression test passed for legacy return outcome rejection; temporary rows were removed.
+- Applied migration: 20260918125358_v1_align_return_reporting_rules.
