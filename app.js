@@ -790,7 +790,7 @@ async function supplierPaymentsView() {
 async function suppliersView() {
   const suppliers = await fetchOne('suppliers', 'id,name,phone,notes');
   const rows = suppliers.map(s => `<tr><td><b>${escapeHtml(s.name)}</b></td><td>${escapeHtml(s.phone || '—')}</td><td>${escapeHtml(s.notes || '—')}</td></tr>`);
-  document.getElementById('view').innerHTML = `<div class="hero"><div><h2>الموردين</h2><p>إدارة بيانات الموردين المستخدمة في المشتريات ومدفوعاتهم.</p></div><button class="button" data-add-supplier>＋ إضافة مورد</button></div><div class="panel">${table(['اسم المورد','الهاتف','ملاحظات'], rows, 'لا يوجد موردون مسجلون حتى الآن.')}</div>`;
+  document.getElementById('view').innerHTML = `<div class="hero"><div><h2>الموردين</h2><p>إدارة بيانات الموردين المستخدمة في المشتريات ومدفوعاتهم ومرتجعاتهم.</p></div><div class="hero-actions"><button class="button secondary" data-open-supplier-return>↩ مرتجع شراء</button><button class="button" data-add-supplier>＋ إضافة مورد</button></div></div><div class="panel">${table(['اسم المورد','الهاتف','ملاحظات'], rows, 'لا يوجد موردون مسجلون حتى الآن.')}</div><div class="panel" id="supplierReturnsPanel" style="margin-top:14px"><div class="empty-state"><b>جارٍ تحميل مرتجعات الموردين…</b></div></div>`;
 }
 
 async function accountsView() {
