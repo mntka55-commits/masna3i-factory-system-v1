@@ -618,8 +618,8 @@ async function returnsView() {
 
 async function customersView() {
   const customers = await fetchOne('customers', 'id,code,name,phone,address');
-  const rows = customers.map(c => `<tr><td><b>${escapeHtml(c.code || '—')}</b></td><td>${escapeHtml(c.name)}</td><td>${escapeHtml(c.phone || '—')}</td><td>${escapeHtml(c.address || '—')}</td></tr>`);
-  document.getElementById('view').innerHTML = `<div class="hero"><div><h2>العملاء</h2><p>إدارة بيانات العملاء المستخدمة في المبيعات والفواتير والتحصيلات.</p></div><button class="button" data-add-customer>＋ إضافة عميل</button></div><div class="panel">${table(['الكود','اسم العميل','الهاتف','العنوان'], rows, 'لا يوجد عملاء مسجلون حتى الآن.')}</div>`;
+  const rows = customers.map(c => `<tr><td><b>${escapeHtml(c.code || '—')}</b></td><td>${escapeHtml(c.name)}</td><td>${escapeHtml(c.phone || '—')}</td><td>${escapeHtml(c.address || '—')}</td><td><button class="table-button" data-account-statement="${escapeHtml(c.id)}" data-account-type="customer">كشف الحساب</button></td></tr>`);
+  document.getElementById('view').innerHTML = `<div class="hero"><div><h2>العملاء</h2><p>إدارة بيانات العملاء المستخدمة في المبيعات والفواتير والتحصيلات.</p></div><button class="button" data-add-customer>＋ إضافة عميل</button></div><div class="panel">${table(['الكود','اسم العميل','الهاتف','العنوان','الحساب'], rows, 'لا يوجد عملاء مسجلون حتى الآن.')}</div>`;
 }
 
 async function supplierPaymentsView() {
@@ -789,8 +789,8 @@ async function supplierPaymentsView() {
 
 async function suppliersView() {
   const suppliers = await fetchOne('suppliers', 'id,name,phone,notes');
-  const rows = suppliers.map(s => `<tr><td><b>${escapeHtml(s.name)}</b></td><td>${escapeHtml(s.phone || '—')}</td><td>${escapeHtml(s.notes || '—')}</td></tr>`);
-  document.getElementById('view').innerHTML = `<div class="hero"><div><h2>الموردين</h2><p>إدارة بيانات الموردين المستخدمة في المشتريات ومدفوعاتهم ومرتجعاتهم.</p></div><div class="hero-actions"><button class="button secondary" data-open-supplier-return>↩ مرتجع شراء</button><button class="button" data-add-supplier>＋ إضافة مورد</button></div></div><div class="panel">${table(['اسم المورد','الهاتف','ملاحظات'], rows, 'لا يوجد موردون مسجلون حتى الآن.')}</div><div class="panel" id="supplierReturnsPanel" style="margin-top:14px"><div class="empty-state"><b>جارٍ تحميل مرتجعات الموردين…</b></div></div>`;
+  const rows = suppliers.map(s => `<tr><td><b>${escapeHtml(s.name)}</b></td><td>${escapeHtml(s.phone || '—')}</td><td>${escapeHtml(s.notes || '—')}</td><td><button class="table-button" data-account-statement="${escapeHtml(s.id)}" data-account-type="supplier">كشف الحساب</button></td></tr>`);
+  document.getElementById('view').innerHTML = `<div class="hero"><div><h2>الموردين</h2><p>إدارة بيانات الموردين المستخدمة في المشتريات ومدفوعاتهم ومرتجعاتهم.</p></div><div class="hero-actions"><button class="button secondary" data-open-supplier-return>↩ مرتجع شراء</button><button class="button" data-add-supplier>＋ إضافة مورد</button></div></div><div class="panel">${table(['اسم المورد','الهاتف','ملاحظات','الحساب'], rows, 'لا يوجد موردون مسجلون حتى الآن.')}</div><div class="panel" id="supplierReturnsPanel" style="margin-top:14px"><div class="empty-state"><b>جارٍ تحميل مرتجعات الموردين…</b></div></div>`;
 }
 
 async function accountsView() {
@@ -830,8 +830,8 @@ async function accountsView() {
     </div>
 
     <div class="two-col">
-      <div class="panel"><div class="panel-head"><div><h3>العملاء</h3><span>بيانات العملاء المستخدمة في الفواتير والتحصيلات.</span></div><button class="button secondary" data-add-customer>＋ إضافة عميل</button></div>${table(['الكود','اسم العميل','الهاتف','العنوان'], customers.map(c=>`<tr><td><b>${escapeHtml(c.code || '—')}</b></td><td>${escapeHtml(c.name)}</td><td>${escapeHtml(c.phone || '—')}</td><td>${escapeHtml(c.address || '—')}</td></tr>`), 'لا يوجد عملاء مسجلون حتى الآن.')}</div>
-      <div class="panel"><div class="panel-head"><div><h3>الموردون</h3><span>بيانات الموردين المستخدمة في المشتريات والمدفوعات.</span></div><button class="button secondary" data-add-supplier>＋ إضافة مورد</button></div>${table(['اسم المورد','الهاتف','ملاحظات'], suppliers.map(s=>`<tr><td><b>${escapeHtml(s.name)}</b></td><td>${escapeHtml(s.phone || '—')}</td><td>${escapeHtml(s.notes || '—')}</td></tr>`), 'لا يوجد موردون مسجلون حتى الآن.')}</div>
+      <div class="panel"><div class="panel-head"><div><h3>العملاء</h3><span>بيانات العملاء المستخدمة في الفواتير والتحصيلات.</span></div><button class="button secondary" data-add-customer>＋ إضافة عميل</button></div>${table(['الكود','اسم العميل','الهاتف','العنوان','الحساب'], customers.map(c=>`<tr><td><b>${escapeHtml(c.code || '—')}</b></td><td>${escapeHtml(c.name)}</td><td>${escapeHtml(c.phone || '—')}</td><td>${escapeHtml(c.address || '—')}</td><td><button class="table-button" data-account-statement="${escapeHtml(c.id)}" data-account-type="customer">كشف الحساب</button></td></tr>`), 'لا يوجد عملاء مسجلون حتى الآن.')}</div>
+      <div class="panel"><div class="panel-head"><div><h3>الموردون</h3><span>بيانات الموردين المستخدمة في المشتريات والمدفوعات.</span></div><button class="button secondary" data-add-supplier>＋ إضافة مورد</button></div>${table(['اسم المورد','الهاتف','ملاحظات','الحساب'], suppliers.map(s=>`<tr><td><b>${escapeHtml(s.name)}</b></td><td>${escapeHtml(s.phone || '—')}</td><td>${escapeHtml(s.notes || '—')}</td><td><button class="table-button" data-account-statement="${escapeHtml(s.id)}" data-account-type="supplier">كشف الحساب</button></td></tr>`), 'لا يوجد موردون مسجلون حتى الآن.')}</div>
     </div>
 
     <div class="two-col">
