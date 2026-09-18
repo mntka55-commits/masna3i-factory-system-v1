@@ -16,6 +16,8 @@ const NAV = [
   ['collections', '▣', 'التحصيلات'],
   ['returns', '↩', 'المرتجعات'],
   ['accounts', '●', 'الحسابات'],
+  ['customers', '●', 'العملاء'],
+  ['suppliers', '◆', 'الموردين'],
   ['reports', '▰', 'التقارير'],
 ];
 
@@ -251,6 +253,18 @@ async function returnsView() {
   document.getElementById('view').innerHTML = `<div class="hero"><div><h2>المرتجعات</h2><p>المرتجع حركة مستقلة ولا يتم تعديل الفاتورة بصمت.</p></div><button class="button">＋ تسجيل مرتجع</button></div><div class="decision-grid"><div class="decision-card good"><b>سليم</b><span>يعود إلى READY</span></div><div class="decision-card"><b>قابل للإصلاح</b><span>Repair → READY</span></div><div class="decision-card"><b>يُباع بخصم</b><span>Discounted Sale</span></div><div class="decision-card danger"><b>هالك</b><span>Scrap</span></div></div><div class="panel">${table(['رقم المرتجع','التاريخ','المصدر','ملاحظة','الحالة'], tr, 'لا توجد مرتجعات حتى الآن.')}</div>`;
 }
 
+async function customersView() {
+  const customers = await fetchOne('customers', 'id,code,name,phone,address');
+  const rows = customers.map(c => `<tr><td><b>${escapeHtml(c.code || '—')}</b></td><td>${escapeHtml(c.name)}</td><td>${escapeHtml(c.phone || '—')}</td><td>${escapeHtml(c.address || '—')}</td></tr>`);
+  document.getElementById('view').innerHTML = `<div class="hero"><div><h2>العملاء</h2><p>إدارة بيانات العملاء المستخدمة في المبيعات والفواتير والتحصيلات.</p></div><button class="button" data-add-customer>＋ إضافة عميل</button></div><div class="panel">${table(['الكود','اسم العميل','الهاتف','العنوان'], rows, 'لا يوجد عملاء مسجلون حتى الآن.')}</div>`;
+}
+
+async function suppliersView() {
+  const suppliers = await fetchOne('suppliers', 'id,name,phone,notes');
+  const rows = suppliers.map(s => `<tr><td><b>${escapeHtml(s.name)}</b></td><td>${escapeHtml(s.phone || '—')}</td><td>${escapeHtml(s.notes || '—')}</td></tr>`);
+  document.getElementById('view').innerHTML = `<div class="hero"><div><h2>الموردين</h2><p>إدارة بيانات الموردين المستخدمة في المشتريات ومدفوعاتهم.</p></div><button class="button" data-add-supplier>＋ إضافة مورد</button></div><div class="panel">${table(['اسم المورد','الهاتف','ملاحظات'], rows, 'لا يوجد موردون مسجلون حتى الآن.')}</div>`;
+}
+
 async function accountsView() {
   const [invoiceBalances, purchaseBalances, moneyBalances, expenses, suppliers, customers] = await Promise.all([
     fetchOne('v_invoice_balances', 'outstanding_total'),
@@ -296,7 +310,7 @@ async function renderRoute() {
   const key = location.hash.replace('#','') || 'dashboard';
   if (!document.getElementById('view')) await buildShell();
   setActiveNav(key);
-  const loaders = { dashboard, models: modelsView, 'model-detail': modelDetailView, inventory: inventoryView, purchases: purchasesView, cutting: cuttingView, wip: wipView, ready: readyView, sales: salesView, invoices: invoicesView, collections: collectionsView, returns: returnsView, accounts: accountsView, reports: reportsView };
+  const loaders = { dashboard, models: modelsView, 'model-detail': modelDetailView, inventory: inventoryView, purchases: purchasesView, cutting: cuttingView, wip: wipView, ready: readyView, sales: salesView, invoices: invoicesView, collections: collectionsView, returns: returnsView, accounts: accountsView, customers: customersView, suppliers: suppliersView, reports: reportsView };
   const loader = loaders[key] || dashboard;
   try { setStatus('جارٍ تحميل البيانات…'); await loader(); setStatus(''); } catch (error) { console.error(error); setStatus(`تعذر تحميل الشاشة: ${error.message}`, 'error'); }
 }
