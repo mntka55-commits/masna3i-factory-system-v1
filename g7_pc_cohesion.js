@@ -4,13 +4,13 @@
     { label: 'الإنتاج', ids: ['models', 'cutting', 'wip', 'ready'] },
     { label: 'المخزون والشراء', ids: ['inventory', 'purchases'] },
     { label: 'المبيعات والتحصيل', ids: ['sales', 'invoices', 'collections', 'returns'] },
-    { label: 'الحسابات والتقارير', ids: ['accounts', 'reports'] },
+    { label: 'الحسابات والتقارير', ids: ['accounts', 'customers', 'suppliers', 'reports'] },
   ];
 
   function enhanceShell() {
     const nav = document.querySelector('.sidebar nav');
     if (!nav) return;
-    const expected = ['dashboard','models','cutting','wip','ready','inventory','purchases','sales','invoices','collections','returns','accounts','reports'];
+    const expected = ['dashboard','models','cutting','wip','ready','inventory','purchases','sales','invoices','collections','returns','accounts','customers','suppliers','reports'];
     const existing = new Map([...nav.querySelectorAll('.nav-item')].map((button) => [button.dataset.nav, button]));
     expected.forEach((id) => { if (!existing.has(id)) { const button = document.querySelector(`.nav-item[data-nav="${id}"]`); if (button) existing.set(id, button); } });
 
