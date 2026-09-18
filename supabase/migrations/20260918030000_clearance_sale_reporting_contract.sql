@@ -113,8 +113,8 @@ begin
   values(v_sale_id, trim(p_invoice_number), p_sale_date)
   returning id into v_invoice_id;
 
-  insert into public.invoice_lines(invoice_id, model_id, quantity, unit_price, line_total)
-  select v_invoice_id, model_id, quantity, unit_price, line_total
+  insert into public.invoice_lines(invoice_id, model_id, quantity, unit_price)
+  select v_invoice_id, model_id, quantity, unit_price
   from public.sale_lines
   where sale_id=v_sale_id;
 
