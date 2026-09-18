@@ -836,7 +836,7 @@ async function accountsView() {
 
     <div class="two-col">
       <div class="panel"><h3>سداد الموردين</h3><p class="muted">مسار مستقل عن الشراء ويؤثر على رصيد المورد والنقدية.</p><button class="button secondary" data-nav="accounts">إعداد الحساب ثم المتابعة</button></div>
-      <div class="panel"><h3>المصروفات</h3><p class="muted">المصروفات منفصلة عن تكلفة الموديل التشغيلية.</p><button class="button secondary" data-nav="accounts">سيتم إكمالها بعد قفل التحصيلات والمدفوعات</button></div>
+      <div class="panel"><h3>المصروفات</h3><p class="muted">المصروفات منفصلة عن تكلفة الموديل التشغيلية، وترحّل على حساب النقدية/البنك المختار.</p><button class="button secondary" data-nav="expenses">فتح المصروفات</button></div>
     </div>
   `;
 
