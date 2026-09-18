@@ -147,7 +147,7 @@
         const amount=Number(document.getElementById('variableCostAmount').value||0);
         if(!name || amount<0) return;
         const res=await client.from('model_variable_costs').insert({
-          factory_id:state.factory.id, model_id:state.modelId, cost_type:'manual',
+          factory_id:state.factory.id, model_id:state.modelId, cost_type:'other',
           name:name, amount_per_piece:amount, notes:document.getElementById('variableCostNotes').value.trim()||null
         });
         if(res.error) return setStatus('تعذر الحفظ: '+res.error.message,'error');
