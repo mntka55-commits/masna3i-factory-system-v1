@@ -130,3 +130,17 @@ No test data remains from the reverted work.
   - Temporary supplier payment: 500 EGP credit.
   - Final running balance: 1500 EGP.
 - Both tests ran inside rollback transactions; no regression data persisted.
+
+
+## Customer-account collections + money accounts — 2026-09-19
+- Collection UI refactored from a global open-invoice picker to a customer-account-first workflow.
+- Customers now expose account balance (amount due / customer credit) and a direct account entry point.
+- Customer account modal shows customer balance, invoices, and statement, with collection started from the customer account.
+- Customer collection supports allocating one payment across multiple invoices; the DB validates customer ownership, invoice ownership, active cash/bank account, allocation totals, and outstanding limits atomically.
+- New RPC: `post_customer_collection(uuid,numeric,date,uuid,jsonb,text,text)`, SECURITY INVOKER; authenticated EXECUTE granted; public/anon EXECUTE revoked.
+- Existing `post_collection` remains intact for backward compatibility; no existing collection RPC was modified.
+- Money-account UI now distinguishes active/inactive accounts, supports activation/deactivation without deleting history, and provides one-click account creation from the collection workflow.
+- No production test rows were persisted.
+- Transactional regression passed for: multi-invoice allocation, over-allocation rejection, allocation-total mismatch rejection, cross-customer allocation rejection, inactive-account rejection, and rollback cleanup.
+- Baseline verified after the test transaction: money accounts = 0, customers = 1, invoice 123 customer_id = NULL.
+- Browser visual verification of the new customer-account UI remains PENDING; current runtime test environment is Chrome on phone with Desktop Site, targeting the PC Web Version.
