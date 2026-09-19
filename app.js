@@ -25,13 +25,69 @@ const NAV = [
 ];
 
 const state = { membership: null, factory: null, user: null, modelId: null };
-const currency = new Intl.NumberFormat('ar-EG', { maximumFractionDigits: 2 });
-const number = new Intl.NumberFormat('ar-EG', { maximumFractionDigits: 0 });
+let routeInFlight = null;
+const DRAFT_PREFIX = 'masna3i:draft:v1:';
+const currency = new Intl.NumberFormat('en-US', { maximumFractionDigits: 2 });
+const number = new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 });
 const money = (value) => `${currency.format(Number(value || 0))} ج`;
 const qty = (value) => number.format(Number(value || 0));
 const escapeHtml = (value) => String(value ?? '').replace(/[&<>'"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#039;', '"': '&quot;' }[c]));
 
 function pageTitle(key) { return NAV.find(([id]) => id === key)?.[2] || 'مصنعي'; }
+
+function draftKey(form) {
+  if (!form || form.dataset.draftSkip === 'true' || form.id === 'loginForm' || form.id === 'factoryForm') return null;
+  const id = form.id || form.dataset.draftId;
+  if (!id) return null;
+  return DRAFT_PREFIX + (state.factory?.id || 'unknown') + ':' + (location.hash || '#dashboard') + ':' + id;
+}
+
+function saveDraft(form) {
+  const key = draftKey(form);
+  if (!key) return;
+  const fields = [...form.querySelectorAll('input,select,textarea')].filter((field) => field.type !== 'password');
+  const data = fields.map((field, index) => ({
+    key: field.name || field.id || field.dataset.draftField || (field.tagName + ':' + index),
+    value: field.type === 'checkbox' || field.type === 'radio' ? field.checked : field.value,
+    checked: field.type === 'checkbox' || field.type === 'radio' ? field.checked : undefined,
+  }));
+  try { localStorage.setItem(key, JSON.stringify({ savedAt: Date.now(), fields: data })); } catch (_) {}
+}
+
+function restoreDraft(form) {
+  if (!form || form.dataset.draftRestored === 'true') return;
+  form.dataset.draftRestored = 'true';
+  const key = draftKey(form);
+  if (!key) return;
+  let payload = null;
+  try { payload = JSON.parse(localStorage.getItem(key) || 'null'); } catch (_) {}
+  if (!payload?.fields?.length) return;
+  const fields = [...form.querySelectorAll('input,select,textarea')].filter((field) => field.type !== 'password');
+  const byKey = new Map(fields.map((field, index) => [field.name || field.id || field.dataset.draftField || (field.tagName + ':' + index), field]));
+  payload.fields.forEach((saved) => {
+    const field = byKey.get(saved.key);
+    if (!field) return;
+    if (field.type === 'checkbox' || field.type === 'radio') field.checked = !!saved.checked;
+    else field.value = saved.value ?? '';
+  });
+}
+
+function enableDraftPersistence() {
+  if (document.documentElement.dataset.draftPersistence === 'true') return;
+  document.documentElement.dataset.draftPersistence = 'true';
+  const capture = (event) => { const form = event.target.closest?.('form'); if (form) saveDraft(form); };
+  document.addEventListener('input', capture, true);
+  document.addEventListener('change', capture, true);
+  document.addEventListener('submit', (event) => {
+    const form = event.target.closest?.('form');
+    const key = draftKey(form);
+    if (!key) return;
+    setTimeout(() => { if (!form.isConnected) { try { localStorage.removeItem(key); } catch (_) {} } }, 2500);
+  }, true);
+  const observer = new MutationObserver(() => document.querySelectorAll('form:not([data-draft-restored])').forEach(restoreDraft));
+  observer.observe(document.body, { childList: true, subtree: true });
+  document.querySelectorAll('form').forEach(restoreDraft);
+}
 function setStatus(text, kind = '') {
   const node = document.querySelector('.global-status');
   if (!node) return;
@@ -117,7 +173,6 @@ async function buildShell() {
     button.addEventListener('click', () => {
       const key = button.dataset.nav;
       location.hash = key;
-      renderRoute();
     });
   });
   document.getElementById('refresh').onclick = () => renderRoute(true);
@@ -180,7 +235,7 @@ async function modelsView() {
   ]);
   const rows = models.map((m) => { const c = costs.find((x) => x.model_id === m.id); return `<tr><td><b>${escapeHtml(m.code)}</b></td><td>${escapeHtml(m.name)}</td><td>${qty(wip.find((x) => x.model_id === m.id)?.wip_pieces)}</td><td>${qty(ready.find((x) => x.model_id === m.id)?.ready_pieces)}</td><td>${c ? money(c.current_cost_per_piece) : '—'}</td><td>${c ? 'آخر قصة مكتملة' : 'لم تُقص بعد'}</td><td><button class="table-button" data-model="${m.id}">التفاصيل</button></td></tr>`; });
   document.getElementById('view').innerHTML = `<div class="hero"><div><h2>الموديلات</h2><p>تعريف ومتابعة تكلفة وإنتاج كل موديل.</p></div><button class="button">＋ إضافة موديل</button></div><div class="toolbar"><input id="modelSearch" placeholder="⌕ ابحث باسم الموديل أو الكود" /><div class="filter-chips"><span class="chip active">الكل</span><span class="chip">قيد الإنتاج</span><span class="chip">جاهز</span></div></div><div class="panel">${table(['الكود','الموديل','WIP','READY','تكلفة القطعة الحالية','المصدر','الإجراء'], rows, 'لا توجد موديلات مسجلة حتى الآن.')}</div>`;
-  document.querySelectorAll('[data-model]').forEach((b) => b.addEventListener('click', () => { state.modelId = b.dataset.model; location.hash = 'model-detail'; renderRoute(); }));
+  document.querySelectorAll('[data-model]').forEach((b) => b.addEventListener('click', () => { state.modelId = b.dataset.model; location.hash = 'model-detail'; }));
 }
 
 async function modelDetailView() {
@@ -290,10 +345,33 @@ async function salesView() {
 }
 
 async function invoicesView() {
-  const balances = await fetchOne('v_invoice_balances', 'invoice_id,invoice_number,invoice_date,customer_id,invoice_total,collected_total,outstanding_total');
-  const customers = await fetchOne('customers', 'id,name');
-  const tr = balances.map((r) => `<tr><td><b>${escapeHtml(r.invoice_number)}</b></td><td>${escapeHtml(customers.find((c)=>c.id===r.customer_id)?.name || '—')}</td><td>${money(r.invoice_total)}</td><td>${money(r.collected_total)}</td><td>${money(r.outstanding_total)}</td><td><span class="status-pill ${Number(r.outstanding_total||0)>0?'warning':'ok'}">${Number(r.outstanding_total||0)>0?'مدفوعة جزئيًا':'مكتملة'}</span></td><td><button class="table-button">طباعة</button></td></tr>`);
-  document.getElementById('view').innerHTML = `<div class="hero"><div><h2>الفواتير</h2><p>فاتورة واضحة للطباعة وإعادة الطباعة.</p></div></div><div class="panel invoice-rule"><b>قاعدة الطباعة:</b> الطباعة وإعادة الطباعة لا تنشئ حركة جديدة ولا تغيّر المخزون أو الحسابات.</div><div class="panel">${table(['رقم الفاتورة','العميل','الإجمالي','المدفوع','المتبقي','الحالة',''], tr, 'لا توجد فواتير حتى الآن.')}</div>`;
+  const [balances, customers] = await Promise.all([
+    fetchOne('v_invoice_balances', 'invoice_id,invoice_number,invoice_date,customer_id,invoice_total,collected_total,outstanding_total'),
+    fetchOne('customers', 'id,name'),
+  ]);
+  const rows = balances.map((r) => {
+    const customer = customers.find((c) => c.id === r.customer_id)?.name || '—';
+    const open = Number(r.outstanding_total || 0) > 0;
+    return `<tr>
+      <td><button type="button" class="table-button" data-print-invoice="${escapeHtml(r.invoice_id)}">${escapeHtml(r.invoice_number)}</button></td>
+      <td>${escapeHtml(customer)}</td>
+      <td>${escapeHtml(r.invoice_date || '—')}</td>
+      <td>${money(r.invoice_total)}</td>
+      <td>${money(r.collected_total)}</td>
+      <td>${money(r.outstanding_total)}</td>
+      <td><span class="status-pill ${open ? 'warning' : 'ok'}">${open ? 'مفتوحة' : 'مكتملة'}</span></td>
+      <td><button type="button" class="table-button" data-print-invoice="${escapeHtml(r.invoice_id)}">عرض / طباعة</button></td>
+    </tr>`;
+  }).join('');
+  document.getElementById('view').innerHTML = `
+    <div class="hero"><div><h2>الفواتير</h2><p>سجل الفواتير وتفاصيلها والطباعة وإعادة الطباعة.</p></div></div>
+    <div class="panel invoice-rule"><b>قاعدة الطباعة:</b> الطباعة وإعادة الطباعة لا تنشئ حركة جديدة ولا تغيّر المخزون أو الحسابات.</div>
+    <div class="panel">${table(['رقم الفاتورة','العميل','التاريخ','الإجمالي','المحصل','المتبقي','الحالة','الإجراء'], rows, 'لا توجد فواتير حتى الآن.')}</div>`;
+  document.querySelectorAll('[data-print-invoice]').forEach((button) => button.addEventListener('click', () => {
+    const fn = window.__printMasna3iInvoice;
+    if (typeof fn === 'function') fn(button.dataset.printInvoice);
+    else setStatus('واجهة الفاتورة غير جاهزة حاليًا.', 'error');
+  }));
 }
 
 async function collectionsView() {
@@ -918,24 +996,31 @@ async function renderRoute() {
 }
 
 function bindInnerNav() {
-  document.querySelectorAll('[data-nav]').forEach((button) => button.addEventListener('click', () => { location.hash = button.dataset.nav; renderRoute(); }));
+  document.querySelectorAll('[data-nav]').forEach((button) => button.addEventListener('click', () => { location.hash = button.dataset.nav; }));
 }
 
 async function route() {
-  const { data: { session } } = await client.auth.getSession();
-  if (!session) return loginScreen();
-  state.user = session.user;
-  const { data: memberships, error } = await client.from('factory_memberships').select('factory_id,role,active').eq('user_id', session.user.id).eq('active', true);
-  if (error) return loginScreen(`تعذر قراءة صلاحية المصنع: ${error.message}`);
-  if (!memberships?.length) return onboardingScreen();
-  state.membership = memberships[0];
-  const { data: factories, error: factoryError } = await client.from('factories').select('id,name,active').eq('id', memberships[0].factory_id).limit(1);
-  if (factoryError) return loginScreen(`تعذر قراءة المصنع: ${factoryError.message}`);
-  state.factory = factories?.[0] || null;
-  await buildShell();
-  await renderRoute();
+  if (routeInFlight) return routeInFlight;
+  routeInFlight = (async () => {
+    const { data: { session } } = await client.auth.getSession();
+    if (!session) return loginScreen();
+    state.user = session.user;
+    const { data: memberships, error } = await client.from('factory_memberships').select('factory_id,role,active').eq('user_id', session.user.id).eq('active', true);
+    if (error) return loginScreen(`تعذر قراءة صلاحية المصنع: ${error.message}`);
+    if (!memberships?.length) return onboardingScreen();
+    state.membership = memberships[0];
+    const { data: factories, error: factoryError } = await client.from('factories').select('id,name,active').eq('id', memberships[0].factory_id).limit(1);
+    if (factoryError) return loginScreen(`تعذر قراءة المصنع: ${factoryError.message}`);
+    state.factory = factories?.[0] || null;
+    await buildShell();
+    enableDraftPersistence();
+    await renderRoute();
+  })();
+  try { return await routeInFlight; } finally { routeInFlight = null; }
 }
 
 window.addEventListener('hashchange', renderRoute);
-client.auth.onAuthStateChange(() => route());
+client.auth.onAuthStateChange((event) => {
+  if (event === 'SIGNED_IN' || event === 'SIGNED_OUT' || event === 'USER_UPDATED') route();
+});
 route();
