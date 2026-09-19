@@ -922,6 +922,112 @@ async function renderRoute() {
   try { setStatus('جارٍ تحميل البيانات…'); await loader(); setStatus(''); } catch (error) { console.error(error); setStatus(`تعذر تحميل الشاشة: ${error.message}`, 'error'); }
 }
 
+function openMoneyAccountModal() {
+  document.getElementById('moneyAccountModal')?.remove();
+  const modal = document.createElement('div');
+  modal.className = 'modal-backdrop';
+  modal.id = 'moneyAccountModal';
+  modal.innerHTML = `
+    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="moneyAccountTitle">
+      <div class="modal-head">
+        <div><span class="eyebrow">حسابات المصنع</span><h3 id="moneyAccountTitle">إضافة حساب نقدية / بنك</h3></div>
+        <button type="button" class="modal-close" data-close-money-account>×</button>
+      </div>
+      <form id="moneyAccountForm" class="stack-form">
+        <label>اسم الحساب
+          <input id="moneyAccountName" required maxlength="120" placeholder="مثال: خزينة المصنع" />
+        </label>
+        <label>نوع الحساب
+          <select id="moneyAccountKind" required>
+            <option value="cash">نقدية</option>
+            <option value="bank">بنك</option>
+          </select>
+        </label>
+        <small class="field-help">الحساب الجديد يبدأ بحالة نشطة، ويمكن تعطيله أو تفعيله لاحقًا من شاشة الحسابات.</small>
+        <div class="modal-actions">
+          <button type="button" class="button secondary" data-close-money-account>إلغاء</button>
+          <button type="submit" class="button" id="saveMoneyAccount">حفظ الحساب</button>
+        </div>
+        <div class="global-status" id="moneyAccountStatus"></div>
+      </form>
+    </div>`;
+  document.body.appendChild(modal);
+
+  const close = () => modal.remove();
+  modal.querySelectorAll('[data-close-money-account]').forEach((button) => button.addEventListener('click', close));
+  modal.addEventListener('click', (event) => { if (event.target === modal) close(); });
+
+  modal.querySelector('#moneyAccountForm').addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const button = modal.querySelector('#saveMoneyAccount');
+    const status = modal.querySelector('#moneyAccountStatus');
+    const name = modal.querySelector('#moneyAccountName').value.trim();
+    const kind = modal.querySelector('#moneyAccountKind').value;
+    if (!name) { status.textContent = 'اسم الحساب مطلوب.'; return; }
+    if (!['cash', 'bank'].includes(kind)) { status.textContent = 'نوع الحساب غير صحيح.'; return; }
+
+    button.disabled = true;
+    button.textContent = 'جارٍ الحفظ…';
+    status.textContent = '';
+
+    const { error } = await client
+      .from('money_accounts')
+      .insert({ name, kind, active: true });
+
+    if (error) {
+      status.textContent = `تعذر إنشاء الحساب: ${error.message}`;
+      button.disabled = false;
+      button.textContent = 'حفظ الحساب';
+      return;
+    }
+
+    close();
+    setStatus('تم إنشاء الحساب وتفعيله بنجاح.', 'info');
+    await renderRoute(true);
+  });
+}
+
+function bindMoneyAccountActions() {
+  if (document.documentElement.dataset.moneyAccountActions === 'true') return;
+  document.documentElement.dataset.moneyAccountActions = 'true';
+
+  document.addEventListener('click', async (event) => {
+    const addButton = event.target.closest('[data-add-money-account]');
+    if (addButton) {
+      event.preventDefault();
+      event.stopPropagation();
+      openMoneyAccountModal();
+      return;
+    }
+
+    const toggleButton = event.target.closest('[data-toggle-money-account]');
+    if (!toggleButton) return;
+
+    event.preventDefault();
+    event.stopPropagation();
+    const accountId = toggleButton.dataset.toggleMoneyAccount;
+    const nextActive = toggleButton.dataset.nextActive === 'true';
+    if (!accountId) return;
+
+    toggleButton.disabled = true;
+    const { error } = await client
+      .from('money_accounts')
+      .update({ active: nextActive })
+      .eq('id', accountId);
+
+    if (error) {
+      toggleButton.disabled = false;
+      setStatus(`تعذر ${nextActive ? 'تفعيل' : 'تعطيل'} الحساب: ${error.message}`, 'error');
+      return;
+    }
+
+    setStatus(nextActive ? 'تم تفعيل الحساب.' : 'تم تعطيل الحساب.', 'info');
+    await renderRoute(true);
+  });
+}
+
+bindMoneyAccountActions();
+
 function bindInnerNav() {
   document.querySelectorAll('[data-nav]').forEach((button) => button.addEventListener('click', () => { location.hash = button.dataset.nav; }));
 }
