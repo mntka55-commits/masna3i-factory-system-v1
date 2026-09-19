@@ -362,7 +362,7 @@ async function invoicesView() {
       <td><span class="status-pill ${open ? 'warning' : 'ok'}">${open ? 'مفتوحة' : 'مكتملة'}</span></td>
       <td><button type="button" class="table-button" data-print-invoice="${escapeHtml(r.invoice_id)}">عرض / طباعة</button></td>
     </tr>`;
-  }).join('');
+  });
   document.getElementById('view').innerHTML = `
     <div class="hero"><div><h2>الفواتير</h2><p>سجل الفواتير وتفاصيلها والطباعة وإعادة الطباعة.</p></div></div>
     <div class="panel invoice-rule"><b>قاعدة الطباعة:</b> الطباعة وإعادة الطباعة لا تنشئ حركة جديدة ولا تغيّر المخزون أو الحسابات.</div>
