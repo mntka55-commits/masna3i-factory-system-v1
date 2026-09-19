@@ -383,13 +383,20 @@ async function invoicesView() {
 }
 
 async function collectionsView() {
-  const [customerBalances, collections, accounts] = await Promise.all([
+  const [customerBalances, invoiceBalances, collections, accounts] = await Promise.all([
     fetchOne('v_customer_account_balances', 'customer_id,code,name,amount_due,customer_credit'),
+    fetchOne('v_invoice_balances', 'invoice_id,invoice_number,invoice_date,customer_id,outstanding_total'),
     fetchOne('collections', 'id,collection_date,account_id,amount,reference,created_at'),
     fetchOne('money_accounts', 'id,name,kind,active'),
   ]);
 
   const debtors = customerBalances.filter((r) => Number(r.amount_due || 0) > 0);
+  const unassignedOpenInvoices = invoiceBalances.filter(
+    (r) => !r.customer_id && Number(r.outstanding_total || 0) > 0
+  );
+  const unassignedOutstanding = unassignedOpenInvoices.reduce(
+    (s, r) => s + Number(r.outstanding_total || 0), 0
+  );
   const totalOutstanding = debtors.reduce((s, r) => s + Number(r.amount_due || 0), 0);
   const totalCollected = collections.reduce((s, r) => s + Number(r.amount || 0), 0);
   const activeAccounts = accounts.filter((a) => a.active);
@@ -414,6 +421,11 @@ async function collectionsView() {
       <h3>الحسابات النقدية / البنكية غير مُعدة</h3>
       <p>أنشئ خزينة أو حسابًا بنكيًا مرة واحدة. الحساب سيظهر بعدها تلقائيًا في التحصيلات والمدفوعات والمصروفات.</p>
       <button class="button" data-add-money-account>＋ إنشاء حساب نقدية / بنك</button>
+    </div>` : ''}
+    ${unassignedOpenInvoices.length ? `<div class="panel note-panel">
+      <h3>تنبيه: فواتير بدون حساب عميل</h3>
+      <p>يوجد ${qty(unassignedOpenInvoices.length)} فاتورة مستحقة بقيمة <b>${money(unassignedOutstanding)}</b> غير مرتبطة بعميل مسجل، لذلك لن تظهر داخل حساب عميل.</p>
+      <button class="button secondary" data-nav="invoices">مراجعة الفواتير</button>
     </div>` : ''}
     <div class="stats-grid">
       ${statCard('▣', 'إجمالي المستحق من العملاء', money(totalOutstanding), `${qty(debtors.length)} عميل عليه مستحق`)}
