@@ -9,7 +9,7 @@
   const esc = (v) => String(v ?? '').replace(/[&<>'"]/g, (c) => ({
     '&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#039;','"':'&#34;'
   }[c]));
-  const money = (v) => new Intl.NumberFormat('ar-EG', { maximumFractionDigits: 2 }).format(Number(v || 0)) + ' ج';
+  const money = (v) => new Intl.NumberFormat('en-US', { maximumFractionDigits: 2 }).format(Number(v || 0)) + ' ج';
   const dateLabel = (v) => v || '—';
 
   const kindLabel = {
