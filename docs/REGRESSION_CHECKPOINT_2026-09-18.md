@@ -141,6 +141,7 @@ No test data remains from the reverted work.
 - Existing `post_collection` remains intact for backward compatibility; no existing collection RPC was modified.
 - Money-account UI now distinguishes active/inactive accounts, supports activation/deactivation without deleting history, and provides one-click account creation from the collection workflow.
 - No production test rows were persisted.
+- Collections page also surfaces open invoices that are not linked to a customer account, so customer-centric workflow does not hide existing receivables.
 - Transactional regression passed for: multi-invoice allocation, over-allocation rejection, allocation-total mismatch rejection, cross-customer allocation rejection, inactive-account rejection, and rollback cleanup.
 - Baseline verified after the test transaction: money accounts = 0, customers = 1, invoice 123 customer_id = NULL.
 - Browser visual verification of the new customer-account UI remains PENDING; current runtime test environment is Chrome on phone with Desktop Site, targeting the PC Web Version.
