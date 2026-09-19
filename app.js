@@ -84,7 +84,15 @@ function enableDraftPersistence() {
     if (!key) return;
     setTimeout(() => { if (!form.isConnected) { try { localStorage.removeItem(key); } catch (_) {} } }, 2500);
   }, true);
-  const observer = new MutationObserver(() => document.querySelectorAll('form:not([data-draft-restored])').forEach(restoreDraft));
+  const observer = new MutationObserver((mutations) => {
+    for (const mutation of mutations) {
+      for (const node of mutation.addedNodes) {
+        if (node.nodeType !== 1) continue;
+        if (node.matches?.('form:not([data-draft-restored])')) restoreDraft(node);
+        node.querySelectorAll?.('form:not([data-draft-restored])').forEach(restoreDraft);
+      }
+    }
+  });
   observer.observe(document.body, { childList: true, subtree: true });
   document.querySelectorAll('form').forEach(restoreDraft);
 }
