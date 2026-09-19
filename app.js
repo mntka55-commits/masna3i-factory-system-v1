@@ -236,27 +236,110 @@ async function dashboard() {
 
 async function modelsView() {
   const [models, wip, ready, costs] = await Promise.all([
-    fetchOne('models', 'id,code,name,selling_price,created_at'),
+    fetchOne('models', 'id,code,name'),
     fetchOne('v_wip_balances', 'model_id,wip_pieces'),
     fetchOne('v_ready_balances', 'model_id,ready_pieces'),
     fetchOne('v_model_current_costs', 'model_id,current_cost_per_piece,fabric_cost_per_piece,variable_cost_per_piece,cutting_operation_id'),
   ]);
-  const rows = models.map((m) => { const c = costs.find((x) => x.model_id === m.id); return `<tr><td><b>${escapeHtml(m.code)}</b></td><td>${escapeHtml(m.name)}</td><td>${qty(wip.find((x) => x.model_id === m.id)?.wip_pieces)}</td><td>${qty(ready.find((x) => x.model_id === m.id)?.ready_pieces)}</td><td>${c ? money(c.current_cost_per_piece) : '—'}</td><td>${c ? 'آخر قصة مكتملة' : 'لم تُقص بعد'}</td><td><button class="table-button" data-model="${m.id}">التفاصيل</button></td></tr>`; });
-  document.getElementById('view').innerHTML = `<div class="hero"><div><h2>الموديلات</h2><p>تعريف ومتابعة تكلفة وإنتاج كل موديل.</p></div><button class="button">＋ إضافة موديل</button></div><div class="toolbar"><input id="modelSearch" placeholder="⌕ ابحث باسم الموديل أو الكود" /><div class="filter-chips"><span class="chip active">الكل</span><span class="chip">قيد الإنتاج</span><span class="chip">جاهز</span></div></div><div class="panel">${table(['الكود','الموديل','WIP','READY','تكلفة القطعة الحالية','المصدر','الإجراء'], rows, 'لا توجد موديلات مسجلة حتى الآن.')}</div>`;
-  document.querySelectorAll('[data-model]').forEach((b) => b.addEventListener('click', () => { state.modelId = b.dataset.model; location.hash = 'model-detail'; }));
+
+  const wipByModel = new Map(wip.map((row) => [row.model_id, row.wip_pieces]));
+  const readyByModel = new Map(ready.map((row) => [row.model_id, row.ready_pieces]));
+  const costByModel = new Map(costs.map((row) => [row.model_id, row]));
+
+  const renderRows = (source) => source.map((m) => {
+    const c = costByModel.get(m.id);
+    const w = Number(wipByModel.get(m.id) || 0);
+    const r = Number(readyByModel.get(m.id) || 0);
+    const haystack = `${m.code || ''} ${m.name || ''}`.toLocaleLowerCase('ar');
+    return {
+      id: m.id,
+      haystack,
+      wip: w,
+      ready: r,
+      html: `<tr data-model-row="${m.id}" data-haystack="${escapeHtml(haystack)}" data-wip="${w}" data-ready="${r}"><td><b>${escapeHtml(m.code)}</b></td><td>${escapeHtml(m.name)}</td><td>${qty(w)}</td><td>${qty(r)}</td><td>${c ? money(c.current_cost_per_piece) : '—'}</td><td>${c ? 'آخر قصة مكتملة' : 'لم تُقص بعد'}</td><td><button class="table-button" data-model="${m.id}">التفاصيل</button></td></tr>`,
+    };
+  });
+
+  let viewRows = renderRows(models);
+
+  const draw = (rows) => {
+    const body = rows.map((row) => row.html).join('');
+    const host = document.querySelector('#modelsTableHost');
+    if (!host) return;
+    host.innerHTML = table(
+      ['الكود','الموديل','WIP','READY','تكلفة القطعة الحالية','المصدر','الإجراء'],
+      rows.map((row) => row.html),
+      'لا توجد موديلات مطابقة للبحث أو الفلتر.'
+    );
+    host.querySelectorAll('[data-model]').forEach((b) => {
+      b.addEventListener('click', () => {
+        state.modelId = b.dataset.model;
+        location.hash = 'model-detail';
+      });
+    });
+  };
+
+  document.getElementById('view').innerHTML = `
+    <div class="hero"><div><h2>الموديلات</h2><p>تعريف ومتابعة تكلفة وإنتاج كل موديل.</p></div><button class="button">＋ إضافة موديل</button></div>
+    <div class="toolbar">
+      <input id="modelSearch" placeholder="⌕ ابحث باسم الموديل أو الكود" />
+      <div class="filter-chips">
+        <button type="button" class="chip active" data-model-filter="all">الكل</button>
+        <button type="button" class="chip" data-model-filter="wip">قيد الإنتاج</button>
+        <button type="button" class="chip" data-model-filter="ready">جاهز</button>
+      </div>
+    </div>
+    <div class="panel" id="modelsTableHost"></div>`;
+
+  let filter = 'all';
+  const applyFilters = () => {
+    const term = String(document.getElementById('modelSearch')?.value || '').trim().toLocaleLowerCase('ar');
+    viewRows = renderRows(models).filter((row) => {
+      const matchesText = !term || row.haystack.includes(term);
+      const matchesFilter =
+        filter === 'all' ||
+        (filter === 'wip' && row.wip > 0) ||
+        (filter === 'ready' && row.ready > 0);
+      return matchesText && matchesFilter;
+    });
+    draw(viewRows);
+  };
+
+  document.getElementById('modelSearch').addEventListener('input', applyFilters);
+  document.querySelectorAll('[data-model-filter]').forEach((button) => {
+    button.addEventListener('click', () => {
+      filter = button.dataset.modelFilter || 'all';
+      document.querySelectorAll('[data-model-filter]').forEach((b) => b.classList.toggle('active', b === button));
+      applyFilters();
+    });
+  });
+
+  draw(viewRows);
 }
 
 async function modelDetailView() {
   if (!state.modelId) { location.hash = 'models'; return modelsView(); }
-  const [models, wip, ready, costs, variable] = await Promise.all([
-    fetchOne('models', 'id,code,name,selling_price,notes').then((rows) => rows.filter((x) => x.id === state.modelId)),
-    fetchOne('v_wip_balances', 'model_id,wip_pieces').then((rows) => rows.filter((x) => x.model_id === state.modelId)),
-    fetchOne('v_ready_balances', 'model_id,ready_pieces').then((rows) => rows.filter((x) => x.model_id === state.modelId)),
-    fetchOne('v_model_current_costs', 'model_id,current_cost_per_piece,fabric_cost_per_piece,variable_cost_per_piece,cutting_operation_id,consumed_quantity,actual_pieces').then((rows) => rows.filter((x) => x.model_id === state.modelId)),
-    fetchOne('model_variable_costs', 'model_id,cost_type,name,amount_per_piece').then((rows) => rows.filter((x) => x.model_id === state.modelId)),
+
+  const modelId = state.modelId;
+  const [modelResult, wipResult, readyResult, costResult] = await Promise.all([
+    client.from('models').select('id,code,name,selling_price,notes').eq('id', modelId).limit(1).single(),
+    client.from('v_wip_balances').select('model_id,wip_pieces').eq('model_id', modelId),
+    client.from('v_ready_balances').select('model_id,ready_pieces').eq('model_id', modelId),
+    client.from('v_model_current_costs').select('model_id,current_cost_per_piece,fabric_cost_per_piece,variable_cost_per_piece,cutting_operation_id,consumed_quantity,actual_pieces').eq('model_id', modelId).limit(1),
   ]);
-  const m = models[0]; if (!m) return modelsView();
-  const c = costs[0];
+
+  if (modelResult.error) throw modelResult.error;
+  if (wipResult.error) throw wipResult.error;
+  if (readyResult.error) throw readyResult.error;
+  if (costResult.error) throw costResult.error;
+
+  const m = modelResult.data;
+  if (!m) return modelsView();
+
+  const wip = wipResult.data || [];
+  const ready = readyResult.data || [];
+  const c = (costResult.data || [])[0];
+
   document.getElementById('view').innerHTML = `<div class="hero"><div><span class="eyebrow">نشط</span><h2>${escapeHtml(m.name)} — ${escapeHtml(m.code)}</h2><p>التكلفة والإنتاج والحركة الفعلية.</p></div><button class="button secondary" data-nav="models">← رجوع للموديلات</button></div><div class="stats-grid three"><div class="stat-card"><div class="stat-icon">◈</div><div><span>تكلفة القطعة الحالية</span><strong>${c ? money(c.current_cost_per_piece) : '—'}</strong><small>من آخر قصة مكتملة</small></div></div>${statCard('▤','WIP',qty(wip[0]?.wip_pieces),'قطعة')}${statCard('◈','READY',qty(ready[0]?.ready_pieces),'قطعة')}</div><div class="two-col"><div class="panel"><div class="panel-head"><div><h3>مكونات التكلفة</h3><span>المصدر الحالي</span></div></div>${table(['البند','القيمة/قطعة','المصدر'], [c ? `<tr><td>استهلاك قماش فعلي</td><td>${money(c.fabric_cost_per_piece)}</td><td>آخر قصة مكتملة</td></tr>` : '', c ? `<tr><td>التكاليف المتغيرة</td><td>${money(c.variable_cost_per_piece)}</td><td>إعدادات الموديل</td></tr>` : ''], c ? '—' : 'لم تُسجل قصة مكتملة لهذا الموديل بعد.')}</div><div class="panel note-panel"><h3>قاعدة مهمة</h3><p>المصدر الحالي للاستهلاك الفعلي هو <b>آخر عملية قص مكتملة للموديل</b>.</p><p>تغيير سعر شراء القماش لاحقًا لا يعيد كتابة تكلفة قصة قديمة.</p><p>التكلفة الثابتة تظل منفصلة ولا تُوزع على تكلفة الموديل في V1.</p></div></div>`;
   bindInnerNav();
 }
