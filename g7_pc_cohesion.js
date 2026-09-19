@@ -43,7 +43,7 @@
 
     const dateNode = document.querySelector('.user-chip small');
     if (dateNode) {
-      const today = new Intl.DateTimeFormat('ar-EG', { dateStyle: 'medium' }).format(new Date());
+      const today = new Intl.DateTimeFormat('en-US', { dateStyle: 'medium' }).format(new Date());
       if (dateNode.textContent !== today) dateNode.textContent = today;
     }
   }
