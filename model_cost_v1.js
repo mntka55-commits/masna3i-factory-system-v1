@@ -8,7 +8,7 @@
     return window.__masna3iClient;
   }
   const esc = (v) => String(v ?? '').replace(/[&<>'"]/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#039;','"':'&quot;'}[c]));
-  const moneyLocal = (v) => new Intl.NumberFormat('ar-EG',{maximumFractionDigits:2}).format(Number(v || 0)) + ' ج';
+  const moneyLocal = (v) => new Intl.NumberFormat('en-US',{maximumFractionDigits:2}).format(Number(v || 0)) + ' ج';
 
   async function modelDetailViewV1() {
     const client = db();
