@@ -383,149 +383,62 @@ async function invoicesView() {
 }
 
 async function collectionsView() {
-  const [balances, collections, accounts, customers] = await Promise.all([
-    fetchOne('v_invoice_balances', 'invoice_id,invoice_number,invoice_date,customer_id,invoice_total,collected_total,outstanding_total'),
+  const [customerBalances, collections, accounts] = await Promise.all([
+    fetchOne('v_customer_account_balances', 'customer_id,code,name,amount_due,customer_credit'),
     fetchOne('collections', 'id,collection_date,account_id,amount,reference,created_at'),
     fetchOne('money_accounts', 'id,name,kind,active'),
-    fetchOne('customers', 'id,name'),
   ]);
 
-  const openInvoices = balances.filter((r) => Number(r.outstanding_total || 0) > 0);
-  const totalOutstanding = openInvoices.reduce((s, r) => s + Number(r.outstanding_total || 0), 0);
+  const debtors = customerBalances.filter((r) => Number(r.amount_due || 0) > 0);
+  const totalOutstanding = debtors.reduce((s, r) => s + Number(r.amount_due || 0), 0);
   const totalCollected = collections.reduce((s, r) => s + Number(r.amount || 0), 0);
   const activeAccounts = accounts.filter((a) => a.active);
 
   const rows = collections
     .slice()
     .sort((a, b) => String(b.collection_date || b.created_at || '').localeCompare(String(a.collection_date || a.created_at || '')))
-    .map((r) => {
-      const invoice = balances.find((x) => Number(x.collected_total || 0) > 0 && x.invoice_id === r.invoice_id);
-      return `<tr><td>${escapeHtml(r.collection_date || r.created_at?.slice(0,10) || '—')}</td><td>${escapeHtml(r.reference || '—')}</td><td>${escapeHtml(accounts.find((a) => a.id === r.account_id)?.name || '—')}</td><td><b>${money(r.amount)}</b></td><td><span class="status-pill ok">مسجل</span></td></tr>`;
-    });
+    .map((r) => \`<tr>
+      <td>\${escapeHtml(r.collection_date || r.created_at?.slice(0, 10) || '—')}</td>
+      <td>\${escapeHtml(r.reference || '—')}</td>
+      <td>\${escapeHtml(accounts.find((a) => a.id === r.account_id)?.name || '—')}</td>
+      <td><b>\${money(r.amount)}</b></td>
+      <td><span class="status-pill ok">مسجل</span></td>
+    </tr>\`);
 
-  document.getElementById('view').innerHTML = `
+  document.getElementById('view').innerHTML = \`
     <div class="hero">
-      <div><h2>التحصيلات</h2><p>التحصيل مستقل عن إنشاء الفاتورة، ويمكن تسجيله على دفعات متعددة حتى إغلاق المستحق.</p></div>
-      <button class="button" id="openCollectionForm">＋ تسجيل تحصيل</button>
+      <div><h2>التحصيلات</h2><p>ابدأ من حساب العميل ثم وزّع التحصيل على فواتيره. لا توجد قائمة فواتير عامة للتدوير عليها.</p></div>
+      <button class="button" data-open-customer-picker>＋ تحصيل من عميل</button>
     </div>
+    \${!activeAccounts.length ? \`<div class="panel note-panel">
+      <h3>الحسابات النقدية / البنكية غير مُعدة</h3>
+      <p>أنشئ خزينة أو حسابًا بنكيًا مرة واحدة. الحساب سيظهر بعدها تلقائيًا في التحصيلات والمدفوعات والمصروفات.</p>
+      <button class="button" data-add-money-account>＋ إنشاء حساب نقدية / بنك</button>
+    </div>\` : ''}
     <div class="stats-grid">
-      ${statCard('▣', 'المستحق من الفواتير', money(totalOutstanding), `${qty(openInvoices.length)} فاتورة مفتوحة`)}
-      ${statCard('✓', 'إجمالي التحصيلات', money(totalCollected), 'حركات فعلية مسجلة')}
-      ${statCard('●', 'حسابات نقدية/بنك', qty(activeAccounts.length), 'متاحة للتحصيل')}
-      ${statCard('↗', 'الفواتير القابلة للتحصيل', qty(openInvoices.length), 'المتبقي أكبر من صفر')}
+      \${statCard('▣', 'إجمالي المستحق من العملاء', money(totalOutstanding), \`\${qty(debtors.length)} عميل عليه مستحق\`)}
+      \${statCard('✓', 'إجمالي التحصيلات', money(totalCollected), 'حركات فعلية مسجلة')}
+      \${statCard('●', 'حسابات نقدية/بنك', qty(activeAccounts.length), 'متاحة للتحصيل')}
+      \${statCard('↗', 'العملاء القابلون للتحصيل', qty(debtors.length), 'ابدأ من حساب العميل')}
+    </div>
+    <div class="panel">
+      <div class="panel-head"><div><h3>حسابات العملاء المفتوحة</h3><span>الاختيار هنا على العميل، والفواتير تظهر داخل حسابه فقط.</span></div></div>
+      \${table(['العميل','الكود','المستحق','لصالح العميل','الإجراء'], debtors.map((r) => \`
+        <tr>
+          <td><b>\${escapeHtml(r.name)}</b></td>
+          <td>\${escapeHtml(r.code || '—')}</td>
+          <td><b>\${money(r.amount_due)}</b></td>
+          <td>\${money(r.customer_credit)}</td>
+          <td><button class="button" data-open-customer-account="\${escapeHtml(r.customer_id)}">فتح الحساب</button><button class="table-button" data-collect-customer="\${escapeHtml(r.customer_id)}">تحصيل</button></td>
+        </tr>\`), 'لا توجد حسابات عملاء عليها مستحقات حاليًا.')}
     </div>
     <div class="panel collection-panel">
-      <div class="panel-head"><div><h3>حركات التحصيل</h3><span>كل حركة مرتبطة بحساب نقدي/بنكي ولا تنشئ فاتورة جديدة.</span></div></div>
-      ${table(['التاريخ','المرجع','الحساب','القيمة','الحالة'], rows, 'لا توجد تحصيلات حتى الآن.')}
+      <div class="panel-head"><div><h3>آخر حركات التحصيل</h3><span>كل حركة مرتبطة بحساب نقدية أو بنك.</span></div></div>
+      \${table(['التاريخ','المرجع','الحساب','القيمة','الحالة'], rows, 'لا توجد تحصيلات حتى الآن.')}
     </div>
-  `;
-
-  const openForm = () => {
-    const today = new Date().toISOString().slice(0, 10);
-    const invoiceOptions = openInvoices.map((r) =>
-      `<option value="${escapeHtml(r.invoice_id)}" data-number="${escapeHtml(r.invoice_number)}" data-max="${Number(r.outstanding_total || 0)}">${escapeHtml(r.invoice_number)} — ${escapeHtml(customers.find((c) => c.id === r.customer_id)?.name || 'بدون عميل')} — متبقي ${money(r.outstanding_total)}</option>`
-    ).join('');
-    const accountOptions = activeAccounts.map((a) => `<option value="${escapeHtml(a.id)}">${escapeHtml(a.name)} — ${escapeHtml(a.kind || '')}</option>`).join('');
-
-    document.body.insertAdjacentHTML('beforeend', `
-      <div class="modal-backdrop" id="collectionModal">
-        <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="collectionTitle">
-          <div class="modal-head"><div><h3 id="collectionTitle">تسجيل تحصيل</h3><span>لا يمكن تجاوز المستحق على الفاتورة.</span></div><button class="modal-close" id="closeCollectionModal">×</button></div>
-          <form id="collectionForm" class="stack-form">
-            <label>الفاتورة
-              <select id="collectionInvoice" required>
-                <option value="">اختر الفاتورة</option>
-                ${invoiceOptions}
-              </select>
-              <small class="field-help" id="collectionOutstanding">اختر فاتورة لمعرفة الحد الأقصى للتحصيل.</small>
-            </label>
-            <label>مبلغ التحصيل
-              <input id="collectionAmount" type="number" min="0.01" step="0.01" required placeholder="مثال: 300" />
-            </label>
-            <label>الحساب
-              <select id="collectionAccount" required ${activeAccounts.length ? '' : 'disabled'}>
-                <option value="">${activeAccounts.length ? 'اختر النقدية / البنك' : 'لا يوجد حساب نشط'}</option>
-                ${accountOptions}
-              </select>
-              ${activeAccounts.length ? '' : '<small class="field-help">أنشئ حساب نقدية/بنك من شاشة الحسابات أولًا.</small>'}
-            </label>
-            <label>تاريخ التحصيل
-              <input id="collectionDate" type="date" value="${today}" required />
-            </label>
-            <label>المرجع
-              <input id="collectionReference" maxlength="120" placeholder="رقم إيصال / تحويل (اختياري)" />
-            </label>
-            <label>ملاحظات
-              <input id="collectionNotes" maxlength="300" placeholder="ملاحظات (اختياري)" />
-            </label>
-            <div class="modal-actions"><button type="button" class="button secondary" id="cancelCollection">إلغاء</button><button type="submit" class="button" id="saveCollection">حفظ التحصيل</button></div>
-            <div class="global-status" id="collectionStatus"></div>
-          </form>
-        </div>
-      </div>
-    `);
-
-    const modal = document.getElementById('collectionModal');
-    const invoiceSelect = document.getElementById('collectionInvoice');
-    const amountInput = document.getElementById('collectionAmount');
-    const outstandingHelp = document.getElementById('collectionOutstanding');
-    const close = () => modal?.remove();
-
-    const syncLimit = () => {
-      const option = invoiceSelect.options[invoiceSelect.selectedIndex];
-      const max = Number(option?.dataset?.max || 0);
-      amountInput.max = max > 0 ? String(max) : '';
-      outstandingHelp.textContent = max > 0 ? `المتاح للتحصيل: ${money(max)}` : 'اختر فاتورة لمعرفة الحد الأقصى للتحصيل.';
-      if (Number(amountInput.value || 0) > max && max > 0) amountInput.value = String(max);
-    };
-
-    invoiceSelect.addEventListener('change', syncLimit);
-    document.getElementById('closeCollectionModal').onclick = close;
-    document.getElementById('cancelCollection').onclick = close;
-    modal.addEventListener('click', (e) => { if (e.target === modal) close(); });
-
-    document.getElementById('collectionForm').addEventListener('submit', async (event) => {
-      event.preventDefault();
-      const status = document.getElementById('collectionStatus');
-      const option = invoiceSelect.options[invoiceSelect.selectedIndex];
-      const invoiceNumber = option?.dataset?.number || '';
-      const amount = Number(amountInput.value || 0);
-      const max = Number(option?.dataset?.max || 0);
-      if (!invoiceNumber) return status.textContent = 'اختر الفاتورة أولًا.';
-      if (amount <= 0) return status.textContent = 'مبلغ التحصيل يجب أن يكون أكبر من صفر.';
-      if (amount > max) return status.textContent = `المبلغ يتجاوز المستحق. الحد الأقصى: ${money(max)}`;
-      if (!document.getElementById('collectionAccount').value) return status.textContent = 'اختر الحساب النقدي/البنكي.';
-
-      const button = document.getElementById('saveCollection');
-      button.disabled = true;
-      button.textContent = 'جارٍ الحفظ…';
-      status.textContent = '';
-
-      const { error } = await client.rpc('post_collection', {
-        p_invoice_number: invoiceNumber,
-        p_amount: amount,
-        p_collection_date: document.getElementById('collectionDate').value,
-        p_account_id: document.getElementById('collectionAccount').value,
-        p_reference: document.getElementById('collectionReference').value.trim() || null,
-        p_notes: document.getElementById('collectionNotes').value.trim() || null,
-      });
-
-      if (error) {
-        status.textContent = `تعذر تسجيل التحصيل: ${error.message}`;
-        button.disabled = false;
-        button.textContent = 'حفظ التحصيل';
-        return;
-      }
-
-      close();
-      setStatus('تم تسجيل التحصيل وتحديث رصيد الفاتورة والحساب.', 'info');
-      await renderRoute(true);
-    });
-  };
-
-  document.getElementById('openCollectionForm').onclick = openForm;
+  \`;
+  bindInnerNav();
 }
-
 
 async function expensesView() {
   const [expenses, categories, accounts] = await Promise.all([
@@ -703,9 +616,29 @@ async function returnsView() {
 }
 
 async function customersView() {
-  const customers = await fetchOne('customers', 'id,code,name,phone,address');
-  const rows = customers.map(c => `<tr><td><b>${escapeHtml(c.code || '—')}</b></td><td>${escapeHtml(c.name)}</td><td>${escapeHtml(c.phone || '—')}</td><td>${escapeHtml(c.address || '—')}</td><td><button class="table-button" data-account-statement="${escapeHtml(c.id)}" data-account-type="customer">كشف الحساب</button></td></tr>`);
-  document.getElementById('view').innerHTML = `<div class="hero"><div><h2>العملاء</h2><p>إدارة بيانات العملاء المستخدمة في المبيعات والفواتير والتحصيلات.</p></div><button class="button" data-add-customer>＋ إضافة عميل</button></div><div class="panel">${table(['الكود','اسم العميل','الهاتف','العنوان','الحساب'], rows, 'لا يوجد عملاء مسجلون حتى الآن.')}</div>`;
+  const [customers, balances] = await Promise.all([
+    fetchOne('customers', 'id,code,name,phone,address'),
+    fetchOne('v_customer_account_balances', 'customer_id,amount_due,customer_credit'),
+  ]);
+  const balanceMap = new Map(balances.map((b) => [b.customer_id, b]));
+  const rows = customers.map(c => {
+    const b = balanceMap.get(c.id) || {};
+    const due = Number(b.amount_due || 0);
+    const credit = Number(b.customer_credit || 0);
+    return \`<tr>
+      <td><b>\${escapeHtml(c.code || '—')}</b></td>
+      <td><b>\${escapeHtml(c.name)}</b></td>
+      <td>\${escapeHtml(c.phone || '—')}</td>
+      <td>\${money(due)}</td>
+      <td>\${money(credit)}</td>
+      <td>
+        <button class="table-button" data-account-statement="\${escapeHtml(c.id)}" data-account-type="customer">فتح الحساب</button>
+        \${due > 0 ? \`<button class="table-button" data-collect-customer="\${escapeHtml(c.id)}">تحصيل</button>\` : ''}
+      </td>
+    </tr>\`;
+  });
+  document.getElementById('view').innerHTML = \`<div class="hero"><div><h2>العملاء</h2><p>حساب كل عميل يجمع فواتيره وتحصيلاته ومرتجعاته في مكان واحد.</p></div><button class="button" data-add-customer>＋ إضافة عميل</button></div><div class="panel">\${table(['الكود','اسم العميل','الهاتف','المطلوب','لصالح العميل','الحساب'], rows, 'لا يوجد عملاء مسجلون حتى الآن.')}</div>\`;
+  bindInnerNav();
 }
 
 async function supplierPaymentsView() {
@@ -880,95 +813,69 @@ async function suppliersView() {
 }
 
 async function accountsView() {
-  const [invoiceBalances, purchaseBalances, moneyBalances, expenses, suppliers, customers] = await Promise.all([
-    fetchOne('v_invoice_balances', 'outstanding_total'),
+  const [customerBalances, purchaseBalances, moneyBalances, expenses, suppliers, customers] = await Promise.all([
+    fetchOne('v_customer_account_balances', 'customer_id,code,name,amount_due,customer_credit'),
     fetchOne('v_purchase_balances', 'remaining_amount'),
-    fetchOne('v_money_balances', 'name,kind,balance'),
+    fetchOne('v_money_balances', 'account_id,name,kind,balance,active'),
     fetchOne('expenses', 'amount,cost_type'),
     fetchOne('suppliers', 'id,name'),
     fetchOne('customers', 'id,code,name,phone,address'),
   ]);
 
-  const customerDue = invoiceBalances.reduce((s,r)=>s+Number(r.outstanding_total||0),0);
+  const customerDue = customerBalances.reduce((s,r)=>s+Number(r.amount_due||0),0);
   const supplierDue = purchaseBalances.reduce((s,r)=>s+Number(r.remaining_amount||0),0);
   const expenseTotal = expenses.reduce((s,r)=>s+Number(r.amount||0),0);
   const cash = moneyBalances.reduce((s,r)=>s+Number(r.balance||0),0);
+  const activeAccounts = moneyBalances.filter((a) => a.active);
 
   const accountRows = moneyBalances.map(a =>
-    `<tr><td><b>${escapeHtml(a.name)}</b></td><td>${escapeHtml(a.kind === 'cash' ? 'نقدية' : a.kind === 'bank' ? 'بنك' : a.kind || '—')}</td><td>${money(a.balance)}</td><td><span class="status-pill ok">نشط</span></td></tr>`
+    \`<tr>
+      <td><b>\${escapeHtml(a.name)}</b></td>
+      <td>\${escapeHtml(a.kind === 'cash' ? 'نقدية' : 'بنك')}</td>
+      <td><b>\${money(a.balance)}</b></td>
+      <td><span class="status-pill \${a.active ? 'ok' : 'neutral'}">\${a.active ? 'نشط' : 'غير نشط'}</span></td>
+      <td><button class="table-button" data-toggle-money-account="\${escapeHtml(a.account_id)}" data-next-active="\${a.active ? 'false' : 'true'}">\${a.active ? 'تعطيل' : 'تفعيل'}</button></td>
+    </tr>\`
   );
 
-  document.getElementById('view').innerHTML = `
-    <div class="hero"><div><h2>الحسابات</h2><p>العملاء والموردون والنقدية والمصروفات.</p></div></div>
+  document.getElementById('view').innerHTML = \`
+    <div class="hero"><div><h2>الحسابات</h2><p>حسابات العملاء والموردين والنقدية والبنك في مكان واحد، مع فصل واضح بين رصيد الكيان والحساب المالي.</p></div></div>
     <div class="stats-grid">
-      ${statCard('●','رصيد العملاء',money(customerDue),`${qty(customers.length)} عميل`)}
-      ${statCard('▰','رصيد الموردين',money(supplierDue),`${qty(suppliers.length)} مورد`)}
-      ${statCard('▥','مصروفات مسجلة',money(expenseTotal),'من الحركات الأصلية')}
-      ${statCard('▣','النقدية والبنك',money(cash),`${qty(moneyBalances.length)} حساب`)}
+      \${statCard('●','رصيد العملاء',money(customerDue),\`\${qty(customers.length)} عميل\`)}
+      \${statCard('▰','رصيد الموردين',money(supplierDue),\`\${qty(suppliers.length)} مورد\`)}
+      \${statCard('▥','مصروفات مسجلة',money(expenseTotal),'من الحركات الأصلية')}
+      \${statCard('▣','النقدية والبنك',money(cash),\`\${qty(activeAccounts.length)} حساب نشط\`)}
     </div>
 
     <div class="panel">
       <div class="panel-head">
-        <div><h3>حسابات النقدية والبنك</h3><span>الحسابات التي تستخدمها التحصيلات ومدفوعات الموردين والمصروفات.</span></div>
-        <button class="button" id="openMoneyAccountForm">＋ إضافة حساب</button>
+        <div><h3>حسابات النقدية والبنك</h3><span>تُستخدم في التحصيلات ومدفوعات الموردين والمصروفات. التعطيل لا يحذف التاريخ.</span></div>
+        <button class="button" data-add-money-account>＋ إضافة حساب</button>
       </div>
-      ${table(['اسم الحساب','النوع','الرصيد الحالي','الحالة'], accountRows, 'لا توجد حسابات نقدية أو بنكية بعد.')}
+      \${table(['اسم الحساب','النوع','الرصيد الحالي','الحالة','الإجراء'], accountRows, 'لا توجد حسابات نقدية أو بنكية بعد.')}
     </div>
 
     <div class="two-col">
-      <div class="panel"><div class="panel-head"><div><h3>العملاء</h3><span>بيانات العملاء المستخدمة في الفواتير والتحصيلات.</span></div><button class="button secondary" data-add-customer>＋ إضافة عميل</button></div>${table(['الكود','اسم العميل','الهاتف','العنوان','الحساب'], customers.map(c=>`<tr><td><b>${escapeHtml(c.code || '—')}</b></td><td>${escapeHtml(c.name)}</td><td>${escapeHtml(c.phone || '—')}</td><td>${escapeHtml(c.address || '—')}</td><td><button class="table-button" data-account-statement="${escapeHtml(c.id)}" data-account-type="customer">كشف الحساب</button></td></tr>`), 'لا يوجد عملاء مسجلون حتى الآن.')}</div>
-      <div class="panel"><div class="panel-head"><div><h3>الموردون</h3><span>بيانات الموردين المستخدمة في المشتريات والمدفوعات.</span></div><button class="button secondary" data-add-supplier>＋ إضافة مورد</button></div>${table(['اسم المورد','الهاتف','ملاحظات','الحساب'], suppliers.map(s=>`<tr><td><b>${escapeHtml(s.name)}</b></td><td>${escapeHtml(s.phone || '—')}</td><td>${escapeHtml(s.notes || '—')}</td><td><button class="table-button" data-account-statement="${escapeHtml(s.id)}" data-account-type="supplier">كشف الحساب</button></td></tr>`), 'لا يوجد موردون مسجلون حتى الآن.')}</div>
+      <div class="panel">
+        <div class="panel-head"><div><h3>العملاء</h3><span>كل عميل له حساب يظهر فيه فواتيره وتحصيلاته ومرتجعاته.</span></div><button class="button secondary" data-add-customer>＋ إضافة عميل</button></div>
+        \${table(['الكود','اسم العميل','الهاتف','المطلوب','لصالح العميل','الحساب'], customers.map(c=>{
+          const b = customerBalances.find(x=>x.customer_id===c.id) || {};
+          const due = Number(b.amount_due||0);
+          return \`<tr><td><b>\${escapeHtml(c.code || '—')}</b></td><td>\${escapeHtml(c.name)}</td><td>\${escapeHtml(c.phone || '—')}</td><td>\${money(due)}</td><td>\${money(b.customer_credit)}</td><td><button class="table-button" data-account-statement="\${escapeHtml(c.id)}" data-account-type="customer">فتح الحساب</button>\${due > 0 ? \` <button class="table-button" data-collect-customer="\${escapeHtml(c.id)}">تحصيل</button>\` : ''}</td></tr>\`;
+        }), 'لا يوجد عملاء مسجلون حتى الآن.')}
+      </div>
+      <div class="panel"><div class="panel-head"><div><h3>الموردون</h3><span>المشتريات والمدفوعات ومرتجعات الشراء.</span></div><button class="button secondary" data-add-supplier>＋ إضافة مورد</button></div>\${table(['اسم المورد','الهاتف','الحساب'], suppliers.map(s=>\`<tr><td><b>\${escapeHtml(s.name)}</b></td><td>\${escapeHtml(s.phone || '—')}</td><td><button class="table-button" data-account-statement="\${escapeHtml(s.id)}" data-account-type="supplier">كشف الحساب</button></td></tr>\`), 'لا يوجد موردون مسجلون حتى الآن.')}</div>
     </div>
 
     <div class="two-col">
-      <div class="panel"><h3>سداد الموردين</h3><p class="muted">مسار مستقل عن الشراء ويؤثر على رصيد المورد والنقدية.</p><button class="button secondary" data-nav="accounts">إعداد الحساب ثم المتابعة</button></div>
-      <div class="panel"><h3>المصروفات</h3><p class="muted">المصروفات منفصلة عن تكلفة الموديل التشغيلية، وترحّل على حساب النقدية/البنك المختار.</p><button class="button secondary" data-nav="expenses">فتح المصروفات</button></div>
+      <div class="panel"><h3>سداد الموردين</h3><p class="muted">دفعة مستقلة عن الشراء وتستخدم نفس حسابات النقدية والبنك النشطة.</p><button class="button secondary" data-nav="supplier-payments">فتح مدفوعات الموردين</button></div>
+      <div class="panel"><h3>المصروفات</h3><p class="muted">المصروفات مرتبطة بحساب الدفع المختار ولا تدخل تلقائيًا في تكلفة الموديل.</p><button class="button secondary" data-nav="expenses">فتح المصروفات</button></div>
     </div>
-  `;
-
-  document.getElementById('openMoneyAccountForm').onclick = () => {
-    document.body.insertAdjacentHTML('beforeend', `
-      <div class="modal-backdrop" id="moneyAccountModal">
-        <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="moneyAccountTitle">
-          <div class="modal-head"><div><h3 id="moneyAccountTitle">إضافة حساب نقدية / بنك</h3><span>الحساب يبدأ برصيد صفر؛ الرصيد الافتتاحي له مسار منفصل.</span></div><button class="modal-close" id="closeMoneyAccount">×</button></div>
-          <form id="moneyAccountForm" class="stack-form">
-            <label>اسم الحساب<input id="moneyAccountName" required maxlength="120" placeholder="مثال: خزينة المصنع" /></label>
-            <label>النوع<select id="moneyAccountKind" required><option value="cash">نقدية</option><option value="bank">بنك</option></select></label>
-            <div class="modal-actions"><button type="button" class="button secondary" id="cancelMoneyAccount">إلغاء</button><button type="submit" class="button" id="saveMoneyAccount">حفظ الحساب</button></div>
-            <div class="global-status" id="moneyAccountStatus"></div>
-          </form>
-        </div>
-      </div>
-    `);
-    const modal=document.getElementById('moneyAccountModal');
-    const close=()=>modal?.remove();
-    document.getElementById('closeMoneyAccount').onclick=close;
-    document.getElementById('cancelMoneyAccount').onclick=close;
-    modal.addEventListener('click',(e)=>{if(e.target===modal)close();});
-    document.getElementById('moneyAccountForm').addEventListener('submit',async(e)=>{
-      e.preventDefault();
-      const status=document.getElementById('moneyAccountStatus');
-      const button=document.getElementById('saveMoneyAccount');
-      const name=document.getElementById('moneyAccountName').value.trim();
-      const kind=document.getElementById('moneyAccountKind').value;
-      if(!name) return;
-      button.disabled=true;
-      button.textContent='جارٍ الحفظ…';
-      const {error}=await client.from('money_accounts').insert({name,kind,active:true});
-      if(error){
-        status.textContent=`تعذر إنشاء الحساب: ${error.message}`;
-        button.disabled=false;
-        button.textContent='حفظ الحساب';
-        return;
-      }
-      close();
-      setStatus('تم إنشاء حساب النقدية/البنك.', 'info');
-      await renderRoute(true);
-    });
-  };
+  \`;
 
   bindInnerNav();
 }
+
 async function reportsView() {
   const [invoices, collections, ready, wip, fixed, variable] = await Promise.all([
     fetchOne('v_invoice_totals', 'invoice_total'),
