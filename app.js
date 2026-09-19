@@ -263,7 +263,6 @@ async function modelsView() {
   let viewRows = renderRows(models);
 
   const draw = (rows) => {
-    const body = rows.map((row) => row.html).join('');
     const host = document.querySelector('#modelsTableHost');
     if (!host) return;
     host.innerHTML = table(
@@ -322,7 +321,7 @@ async function modelDetailView() {
 
   const modelId = state.modelId;
   const [modelResult, wipResult, readyResult, costResult] = await Promise.all([
-    client.from('models').select('id,code,name,selling_price,notes').eq('id', modelId).limit(1).single(),
+    client.from('models').select('id,code,name,selling_price,notes').eq('id', modelId).limit(1).maybeSingle(),
     client.from('v_wip_balances').select('model_id,wip_pieces').eq('model_id', modelId),
     client.from('v_ready_balances').select('model_id,ready_pieces').eq('model_id', modelId),
     client.from('v_model_current_costs').select('model_id,current_cost_per_piece,fabric_cost_per_piece,variable_cost_per_piece,cutting_operation_id,consumed_quantity,actual_pieces').eq('model_id', modelId).limit(1),
