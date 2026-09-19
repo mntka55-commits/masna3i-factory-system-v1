@@ -150,7 +150,7 @@
           return '<tr>' +
             '<td><b>' + esc(row.code) + '</b><br><span class="muted">' + esc(row.name) + '</span></td>' +
             '<td>' + esc(row.kind) + '</td>' +
-            '<td>' + current.toLocaleString('ar-EG') + ' ' + esc(row.unit) + '</td>' +
+            '<td>' + current.toLocaleString('en-US') + ' ' + esc(row.unit) + '</td>' +
             '<td>' + money(row.inventory_value) + '</td>' +
             '<td>' + (isLow ? '<span class="tag danger">منخفض</span>' : '<span class="tag">طبيعي</span>') + '</td>' +
           '</tr>';
