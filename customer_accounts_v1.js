@@ -1,5 +1,14 @@
 (() => {
-  const c = () => window.__masna3iClient || null;
+  function c() {
+    if (window.__masna3iClient) return window.__masna3iClient;
+    const createClient = window.supabase?.createClient;
+    if (!createClient) return null;
+    window.__masna3iClient = createClient(
+      'https://favitcmfzdlvgtwicxmb.supabase.co',
+      'sb_publishable_to-VILINGqpWLu7Sod8ULQ_YBGMP7MZ',
+    );
+    return window.__masna3iClient;
+  }
   if (!c()) return;
 
   const esc = (v) => String(v ?? '').replace(/[&<>'"]/g, (x) => ({
@@ -207,6 +216,11 @@
             <label>مبلغ التحصيل<input id="customerCollectionAmount" type="number" min="0.01" step="0.01" placeholder="مثال: 1,000" /></label>
             <label>الحساب المستلم<select id="customerCollectionAccount"><option value="">اختر الحساب</option>${activeAccounts.map((a) => `<option value="${esc(a.id)}">${esc(a.name)} — ${kindLabel(a.kind)}</option>`).join('')}</select></label>
           </div>
+          <div class="form-grid">
+            <label>تاريخ التحصيل<input id="customerCollectionDate" type="date" value="${today()}" required /></label>
+            <label>المرجع<input id="customerCollectionReference" maxlength="120" placeholder="رقم إيصال / تحويل (اختياري)" /></label>
+          </div>
+          <label>ملاحظات<input id="customerCollectionNotes" maxlength="300" placeholder="ملاحظات (اختياري)" /></label>
           <div id="customerAllocationBox" class="allocation-box" style="margin-top:10px"></div>
           <div class="allocation-total"><span>إجمالي التوزيع</span><strong id="customerAllocationTotal">0 ج</strong></div>
           <div class="modal-actions">
@@ -286,11 +300,11 @@
           const { error } = await supabase.rpc('post_customer_collection', {
             p_customer_id: customerId,
             p_amount: amountValue,
-            p_collection_date: today(),
+            p_collection_date: modal.querySelector('#customerCollectionDate').value,
             p_account_id: accountId,
             p_allocations: allocations,
-            p_reference: null,
-            p_notes: null,
+            p_reference: modal.querySelector('#customerCollectionReference').value.trim() || null,
+            p_notes: modal.querySelector('#customerCollectionNotes').value.trim() || null,
           });
           if (error) throw error;
           status.className = 'modal-status success';
