@@ -8,8 +8,8 @@
 
   const today = () => new Date().toISOString().slice(0, 10);
   const esc = (v) => String(v ?? '').replace(/[&<>'"]/g, (c) => ({ '&':'&#38;', '<':'&#60;', '>':'&#62;', "'":'&#039;', '"':'&#34;' }[c]));
-  const money = (v) => new Intl.NumberFormat('ar-EG', { maximumFractionDigits: 2 }).format(Number(v || 0)) + ' ج';
-  const qty = (v) => new Intl.NumberFormat('ar-EG', { maximumFractionDigits: 3 }).format(Number(v || 0));
+  const money = (v) => new Intl.NumberFormat('en-US', { maximumFractionDigits: 2 }).format(Number(v || 0)) + ' ج';
+  const qty = (v) => new Intl.NumberFormat('en-US', { maximumFractionDigits: 3 }).format(Number(v || 0));
 
   async function loadContext() {
     const results = await Promise.all([
