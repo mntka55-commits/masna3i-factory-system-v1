@@ -397,46 +397,46 @@ async function collectionsView() {
   const rows = collections
     .slice()
     .sort((a, b) => String(b.collection_date || b.created_at || '').localeCompare(String(a.collection_date || a.created_at || '')))
-    .map((r) => \`<tr>
-      <td>\${escapeHtml(r.collection_date || r.created_at?.slice(0, 10) || '—')}</td>
-      <td>\${escapeHtml(r.reference || '—')}</td>
-      <td>\${escapeHtml(accounts.find((a) => a.id === r.account_id)?.name || '—')}</td>
-      <td><b>\${money(r.amount)}</b></td>
+    .map((r) => `<tr>
+      <td>${escapeHtml(r.collection_date || r.created_at?.slice(0, 10) || '—')}</td>
+      <td>${escapeHtml(r.reference || '—')}</td>
+      <td>${escapeHtml(accounts.find((a) => a.id === r.account_id)?.name || '—')}</td>
+      <td><b>${money(r.amount)}</b></td>
       <td><span class="status-pill ok">مسجل</span></td>
-    </tr>\`);
+    </tr>`);
 
-  document.getElementById('view').innerHTML = \`
+  document.getElementById('view').innerHTML = `
     <div class="hero">
       <div><h2>التحصيلات</h2><p>ابدأ من حساب العميل ثم وزّع التحصيل على فواتيره. لا توجد قائمة فواتير عامة للتدوير عليها.</p></div>
       <button class="button" data-open-customer-picker>＋ تحصيل من عميل</button>
     </div>
-    \${!activeAccounts.length ? \`<div class="panel note-panel">
+    ${!activeAccounts.length ? `<div class="panel note-panel">
       <h3>الحسابات النقدية / البنكية غير مُعدة</h3>
       <p>أنشئ خزينة أو حسابًا بنكيًا مرة واحدة. الحساب سيظهر بعدها تلقائيًا في التحصيلات والمدفوعات والمصروفات.</p>
       <button class="button" data-add-money-account>＋ إنشاء حساب نقدية / بنك</button>
-    </div>\` : ''}
+    </div>` : ''}
     <div class="stats-grid">
-      \${statCard('▣', 'إجمالي المستحق من العملاء', money(totalOutstanding), \`\${qty(debtors.length)} عميل عليه مستحق\`)}
-      \${statCard('✓', 'إجمالي التحصيلات', money(totalCollected), 'حركات فعلية مسجلة')}
-      \${statCard('●', 'حسابات نقدية/بنك', qty(activeAccounts.length), 'متاحة للتحصيل')}
-      \${statCard('↗', 'العملاء القابلون للتحصيل', qty(debtors.length), 'ابدأ من حساب العميل')}
+      ${statCard('▣', 'إجمالي المستحق من العملاء', money(totalOutstanding), `${qty(debtors.length)} عميل عليه مستحق`)}
+      ${statCard('✓', 'إجمالي التحصيلات', money(totalCollected), 'حركات فعلية مسجلة')}
+      ${statCard('●', 'حسابات نقدية/بنك', qty(activeAccounts.length), 'متاحة للتحصيل')}
+      ${statCard('↗', 'العملاء القابلون للتحصيل', qty(debtors.length), 'ابدأ من حساب العميل')}
     </div>
     <div class="panel">
       <div class="panel-head"><div><h3>حسابات العملاء المفتوحة</h3><span>الاختيار هنا على العميل، والفواتير تظهر داخل حسابه فقط.</span></div></div>
-      \${table(['العميل','الكود','المستحق','لصالح العميل','الإجراء'], debtors.map((r) => \`
+      ${table(['العميل','الكود','المستحق','لصالح العميل','الإجراء'], debtors.map((r) => `
         <tr>
-          <td><b>\${escapeHtml(r.name)}</b></td>
-          <td>\${escapeHtml(r.code || '—')}</td>
-          <td><b>\${money(r.amount_due)}</b></td>
-          <td>\${money(r.customer_credit)}</td>
-          <td><button class="button" data-open-customer-account="\${escapeHtml(r.customer_id)}">فتح الحساب</button><button class="table-button" data-collect-customer="\${escapeHtml(r.customer_id)}">تحصيل</button></td>
-        </tr>\`), 'لا توجد حسابات عملاء عليها مستحقات حاليًا.')}
+          <td><b>${escapeHtml(r.name)}</b></td>
+          <td>${escapeHtml(r.code || '—')}</td>
+          <td><b>${money(r.amount_due)}</b></td>
+          <td>${money(r.customer_credit)}</td>
+          <td><button class="button" data-open-customer-account="${escapeHtml(r.customer_id)}">فتح الحساب</button><button class="table-button" data-collect-customer="${escapeHtml(r.customer_id)}">تحصيل</button></td>
+        </tr>`), 'لا توجد حسابات عملاء عليها مستحقات حاليًا.')}
     </div>
     <div class="panel collection-panel">
       <div class="panel-head"><div><h3>آخر حركات التحصيل</h3><span>كل حركة مرتبطة بحساب نقدية أو بنك.</span></div></div>
-      \${table(['التاريخ','المرجع','الحساب','القيمة','الحالة'], rows, 'لا توجد تحصيلات حتى الآن.')}
+      ${table(['التاريخ','المرجع','الحساب','القيمة','الحالة'], rows, 'لا توجد تحصيلات حتى الآن.')}
     </div>
-  \`;
+  `;
   bindInnerNav();
 }
 
@@ -625,19 +625,19 @@ async function customersView() {
     const b = balanceMap.get(c.id) || {};
     const due = Number(b.amount_due || 0);
     const credit = Number(b.customer_credit || 0);
-    return \`<tr>
-      <td><b>\${escapeHtml(c.code || '—')}</b></td>
-      <td><b>\${escapeHtml(c.name)}</b></td>
-      <td>\${escapeHtml(c.phone || '—')}</td>
-      <td>\${money(due)}</td>
-      <td>\${money(credit)}</td>
+    return `<tr>
+      <td><b>${escapeHtml(c.code || '—')}</b></td>
+      <td><b>${escapeHtml(c.name)}</b></td>
+      <td>${escapeHtml(c.phone || '—')}</td>
+      <td>${money(due)}</td>
+      <td>${money(credit)}</td>
       <td>
-        <button class="table-button" data-account-statement="\${escapeHtml(c.id)}" data-account-type="customer">فتح الحساب</button>
-        \${due > 0 ? \`<button class="table-button" data-collect-customer="\${escapeHtml(c.id)}">تحصيل</button>\` : ''}
+        <button class="table-button" data-account-statement="${escapeHtml(c.id)}" data-account-type="customer">فتح الحساب</button>
+        ${due > 0 ? `<button class="table-button" data-collect-customer="${escapeHtml(c.id)}">تحصيل</button>` : ''}
       </td>
-    </tr>\`;
+    </tr>`;
   });
-  document.getElementById('view').innerHTML = \`<div class="hero"><div><h2>العملاء</h2><p>حساب كل عميل يجمع فواتيره وتحصيلاته ومرتجعاته في مكان واحد.</p></div><button class="button" data-add-customer>＋ إضافة عميل</button></div><div class="panel">\${table(['الكود','اسم العميل','الهاتف','المطلوب','لصالح العميل','الحساب'], rows, 'لا يوجد عملاء مسجلون حتى الآن.')}</div>\`;
+  document.getElementById('view').innerHTML = `<div class="hero"><div><h2>العملاء</h2><p>حساب كل عميل يجمع فواتيره وتحصيلاته ومرتجعاته في مكان واحد.</p></div><button class="button" data-add-customer>＋ إضافة عميل</button></div><div class="panel">${table(['الكود','اسم العميل','الهاتف','المطلوب','لصالح العميل','الحساب'], rows, 'لا يوجد عملاء مسجلون حتى الآن.')}</div>`;
   bindInnerNav();
 }
 
@@ -829,22 +829,22 @@ async function accountsView() {
   const activeAccounts = moneyBalances.filter((a) => a.active);
 
   const accountRows = moneyBalances.map(a =>
-    \`<tr>
-      <td><b>\${escapeHtml(a.name)}</b></td>
-      <td>\${escapeHtml(a.kind === 'cash' ? 'نقدية' : 'بنك')}</td>
-      <td><b>\${money(a.balance)}</b></td>
-      <td><span class="status-pill \${a.active ? 'ok' : 'neutral'}">\${a.active ? 'نشط' : 'غير نشط'}</span></td>
-      <td><button class="table-button" data-toggle-money-account="\${escapeHtml(a.account_id)}" data-next-active="\${a.active ? 'false' : 'true'}">\${a.active ? 'تعطيل' : 'تفعيل'}</button></td>
-    </tr>\`
+    `<tr>
+      <td><b>${escapeHtml(a.name)}</b></td>
+      <td>${escapeHtml(a.kind === 'cash' ? 'نقدية' : 'بنك')}</td>
+      <td><b>${money(a.balance)}</b></td>
+      <td><span class="status-pill ${a.active ? 'ok' : 'neutral'}">${a.active ? 'نشط' : 'غير نشط'}</span></td>
+      <td><button class="table-button" data-toggle-money-account="${escapeHtml(a.account_id)}" data-next-active="${a.active ? 'false' : 'true'}">${a.active ? 'تعطيل' : 'تفعيل'}</button></td>
+    </tr>`
   );
 
-  document.getElementById('view').innerHTML = \`
+  document.getElementById('view').innerHTML = `
     <div class="hero"><div><h2>الحسابات</h2><p>حسابات العملاء والموردين والنقدية والبنك في مكان واحد، مع فصل واضح بين رصيد الكيان والحساب المالي.</p></div></div>
     <div class="stats-grid">
-      \${statCard('●','رصيد العملاء',money(customerDue),\`\${qty(customers.length)} عميل\`)}
-      \${statCard('▰','رصيد الموردين',money(supplierDue),\`\${qty(suppliers.length)} مورد\`)}
-      \${statCard('▥','مصروفات مسجلة',money(expenseTotal),'من الحركات الأصلية')}
-      \${statCard('▣','النقدية والبنك',money(cash),\`\${qty(activeAccounts.length)} حساب نشط\`)}
+      ${statCard('●','رصيد العملاء',money(customerDue),`${qty(customers.length)} عميل`)}
+      ${statCard('▰','رصيد الموردين',money(supplierDue),`${qty(suppliers.length)} مورد`)}
+      ${statCard('▥','مصروفات مسجلة',money(expenseTotal),'من الحركات الأصلية')}
+      ${statCard('▣','النقدية والبنك',money(cash),`${qty(activeAccounts.length)} حساب نشط`)}
     </div>
 
     <div class="panel">
@@ -852,26 +852,26 @@ async function accountsView() {
         <div><h3>حسابات النقدية والبنك</h3><span>تُستخدم في التحصيلات ومدفوعات الموردين والمصروفات. التعطيل لا يحذف التاريخ.</span></div>
         <button class="button" data-add-money-account>＋ إضافة حساب</button>
       </div>
-      \${table(['اسم الحساب','النوع','الرصيد الحالي','الحالة','الإجراء'], accountRows, 'لا توجد حسابات نقدية أو بنكية بعد.')}
+      ${table(['اسم الحساب','النوع','الرصيد الحالي','الحالة','الإجراء'], accountRows, 'لا توجد حسابات نقدية أو بنكية بعد.')}
     </div>
 
     <div class="two-col">
       <div class="panel">
         <div class="panel-head"><div><h3>العملاء</h3><span>كل عميل له حساب يظهر فيه فواتيره وتحصيلاته ومرتجعاته.</span></div><button class="button secondary" data-add-customer>＋ إضافة عميل</button></div>
-        \${table(['الكود','اسم العميل','الهاتف','المطلوب','لصالح العميل','الحساب'], customers.map(c=>{
+        ${table(['الكود','اسم العميل','الهاتف','المطلوب','لصالح العميل','الحساب'], customers.map(c=>{
           const b = customerBalances.find(x=>x.customer_id===c.id) || {};
           const due = Number(b.amount_due||0);
-          return \`<tr><td><b>\${escapeHtml(c.code || '—')}</b></td><td>\${escapeHtml(c.name)}</td><td>\${escapeHtml(c.phone || '—')}</td><td>\${money(due)}</td><td>\${money(b.customer_credit)}</td><td><button class="table-button" data-account-statement="\${escapeHtml(c.id)}" data-account-type="customer">فتح الحساب</button>\${due > 0 ? \` <button class="table-button" data-collect-customer="\${escapeHtml(c.id)}">تحصيل</button>\` : ''}</td></tr>\`;
+          return `<tr><td><b>${escapeHtml(c.code || '—')}</b></td><td>${escapeHtml(c.name)}</td><td>${escapeHtml(c.phone || '—')}</td><td>${money(due)}</td><td>${money(b.customer_credit)}</td><td><button class="table-button" data-account-statement="${escapeHtml(c.id)}" data-account-type="customer">فتح الحساب</button>${due > 0 ? ` <button class="table-button" data-collect-customer="${escapeHtml(c.id)}">تحصيل</button>` : ''}</td></tr>`;
         }), 'لا يوجد عملاء مسجلون حتى الآن.')}
       </div>
-      <div class="panel"><div class="panel-head"><div><h3>الموردون</h3><span>المشتريات والمدفوعات ومرتجعات الشراء.</span></div><button class="button secondary" data-add-supplier>＋ إضافة مورد</button></div>\${table(['اسم المورد','الهاتف','الحساب'], suppliers.map(s=>\`<tr><td><b>\${escapeHtml(s.name)}</b></td><td>\${escapeHtml(s.phone || '—')}</td><td><button class="table-button" data-account-statement="\${escapeHtml(s.id)}" data-account-type="supplier">كشف الحساب</button></td></tr>\`), 'لا يوجد موردون مسجلون حتى الآن.')}</div>
+      <div class="panel"><div class="panel-head"><div><h3>الموردون</h3><span>المشتريات والمدفوعات ومرتجعات الشراء.</span></div><button class="button secondary" data-add-supplier>＋ إضافة مورد</button></div>${table(['اسم المورد','الهاتف','الحساب'], suppliers.map(s=>`<tr><td><b>${escapeHtml(s.name)}</b></td><td>${escapeHtml(s.phone || '—')}</td><td><button class="table-button" data-account-statement="${escapeHtml(s.id)}" data-account-type="supplier">كشف الحساب</button></td></tr>`), 'لا يوجد موردون مسجلون حتى الآن.')}</div>
     </div>
 
     <div class="two-col">
       <div class="panel"><h3>سداد الموردين</h3><p class="muted">دفعة مستقلة عن الشراء وتستخدم نفس حسابات النقدية والبنك النشطة.</p><button class="button secondary" data-nav="supplier-payments">فتح مدفوعات الموردين</button></div>
       <div class="panel"><h3>المصروفات</h3><p class="muted">المصروفات مرتبطة بحساب الدفع المختار ولا تدخل تلقائيًا في تكلفة الموديل.</p><button class="button secondary" data-nav="expenses">فتح المصروفات</button></div>
     </div>
-  \`;
+  `;
 
   bindInnerNav();
 }
