@@ -48,7 +48,6 @@
     }
   }
 
-  const observer = new MutationObserver(enhanceShell);
-  observer.observe(document.getElementById('app'), { childList: true, subtree: true });
+  window.__masna3iEnhanceShell = enhanceShell;
   enhanceShell();
 })();
