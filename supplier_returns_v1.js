@@ -258,19 +258,16 @@
     }
   }
 
-  function bind() {
-    document.querySelectorAll('[data-open-supplier-return]').forEach((b) => {
-      if (b.dataset.supplierReturnBound) return;
-      b.dataset.supplierReturnBound = '1';
-      b.addEventListener('click', openModal);
-    });
-    const panel = document.getElementById('supplierReturnsPanel');
-    if (panel && panel.dataset.bound !== '1') {
-      panel.dataset.bound = '1';
-      renderPanel();
-    }
-  }
+  window.__masna3iOpenSupplierReturnModal = openModal;
+  window.__masna3iRenderSupplierReturnsPanel = renderPanel;
 
-  new MutationObserver(bind).observe(document.body, { childList: true, subtree: true });
-  bind();
+  if (!document.documentElement.dataset.supplierReturnClickDelegation) {
+    document.documentElement.dataset.supplierReturnClickDelegation = '1';
+    document.addEventListener('click', (event) => {
+      const button = event.target.closest?.('[data-open-supplier-return]');
+      if (!button) return;
+      event.preventDefault();
+      openModal();
+    });
+  }
 })();
