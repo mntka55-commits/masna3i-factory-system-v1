@@ -100,11 +100,13 @@
     };
   }
 
-  function bind() {
-    const buttons = [...document.querySelectorAll('.hero .button')].filter((b) => b.textContent.includes('شراء جديد'));
-    buttons.forEach((b) => { if (b.dataset.purchaseBound) return; b.dataset.purchaseBound = '1'; b.onclick = openPurchaseModal; });
+  if (!document.documentElement.dataset.purchaseClickDelegation) {
+    document.documentElement.dataset.purchaseClickDelegation = '1';
+    document.addEventListener('click', (event) => {
+      const button = event.target.closest?.('.hero .button');
+      if (!button || !button.textContent.includes('شراء جديد')) return;
+      event.preventDefault();
+      openPurchaseModal();
+    });
   }
-
-  new MutationObserver(bind).observe(document.body, { childList: true, subtree: true });
-  bind();
 })();
