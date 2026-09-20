@@ -246,74 +246,25 @@ async function modelsView() {
   const readyByModel = new Map(ready.map((row) => [row.model_id, row.ready_pieces]));
   const costByModel = new Map(costs.map((row) => [row.model_id, row]));
 
-  const renderRows = (source) => source.map((m) => {
+  const rows = models.map((m) => {
     const c = costByModel.get(m.id);
     const w = Number(wipByModel.get(m.id) || 0);
     const r = Number(readyByModel.get(m.id) || 0);
-    const haystack = `${m.code || ''} ${m.name || ''}`.toLocaleLowerCase('ar');
-    return {
-      id: m.id,
-      haystack,
-      wip: w,
-      ready: r,
-      html: `<tr data-model-row="${m.id}" data-haystack="${escapeHtml(haystack)}" data-wip="${w}" data-ready="${r}"><td><b>${escapeHtml(m.code)}</b></td><td>${escapeHtml(m.name)}</td><td>${qty(w)}</td><td>${qty(r)}</td><td>${c ? money(c.current_cost_per_piece) : '—'}</td><td>${c ? 'آخر قصة مكتملة' : 'لم تُقص بعد'}</td><td><button class="table-button" data-model="${m.id}">التفاصيل</button></td></tr>`,
-    };
+    return `<tr><td><b>${escapeHtml(m.code)}</b></td><td>${escapeHtml(m.name)}</td><td>${qty(w)}</td><td>${qty(r)}</td><td>${c ? money(c.current_cost_per_piece) : '—'}</td><td>${c ? 'آخر قصة مكتملة' : 'لم تُقص بعد'}</td><td><button class="table-button" data-model="${m.id}">التفاصيل</button></td></tr>`;
   });
-
-  let viewRows = renderRows(models);
-
-  const draw = (rows) => {
-    const host = document.querySelector('#modelsTableHost');
-    if (!host) return;
-    host.innerHTML = table(
-      ['الكود','الموديل','WIP','READY','تكلفة القطعة الحالية','المصدر','الإجراء'],
-      rows.map((row) => row.html),
-      'لا توجد موديلات مطابقة للبحث أو الفلتر.'
-    );
-    host.querySelectorAll('[data-model]').forEach((b) => {
-      b.addEventListener('click', () => {
-        state.modelId = b.dataset.model;
-        location.hash = 'model-detail';
-      });
-    });
-  };
 
   document.getElementById('view').innerHTML = `
     <div class="hero"><div><h2>الموديلات</h2><p>تعريف ومتابعة تكلفة وإنتاج كل موديل.</p></div><button class="button">＋ إضافة موديل</button></div>
     <div class="toolbar">
       <input id="modelSearch" placeholder="⌕ ابحث باسم الموديل أو الكود" />
       <div class="filter-chips">
-        <button type="button" class="chip active" data-model-filter="all">الكل</button>
-        <button type="button" class="chip" data-model-filter="wip">قيد الإنتاج</button>
-        <button type="button" class="chip" data-model-filter="ready">جاهز</button>
+        <span class="chip active">الكل</span>
+        <span class="chip">قيد الإنتاج</span>
+        <span class="chip">جاهز</span>
       </div>
     </div>
-    <div class="panel" id="modelsTableHost"></div>`;
-
-  let filter = 'all';
-  const applyFilters = () => {
-    const term = String(document.getElementById('modelSearch')?.value || '').trim().toLocaleLowerCase('ar');
-    viewRows = renderRows(models).filter((row) => {
-      const matchesText = !term || row.haystack.includes(term);
-      const matchesFilter =
-        filter === 'all' ||
-        (filter === 'wip' && row.wip > 0) ||
-        (filter === 'ready' && row.ready > 0);
-      return matchesText && matchesFilter;
-    });
-    draw(viewRows);
-  };
-
-  document.getElementById('modelSearch').addEventListener('input', applyFilters);
-  document.querySelectorAll('[data-model-filter]').forEach((button) => {
-    button.addEventListener('click', () => {
-      filter = button.dataset.modelFilter || 'all';
-      document.querySelectorAll('[data-model-filter]').forEach((b) => b.classList.toggle('active', b === button));
-      applyFilters();
-    });
-  });
-
-  draw(viewRows);
+    <div class="panel">${table(['الكود','الموديل','WIP','READY','تكلفة القطعة الحالية','المصدر','الإجراء'], rows, 'لا توجد موديلات مسجلة حتى الآن.')}</div>`;
+  document.querySelectorAll('[data-model]').forEach((b) => b.addEventListener('click', () => { state.modelId = b.dataset.model; location.hash = 'model-detail'; }));
 }
 
 async function modelDetailView() {
