@@ -184,12 +184,7 @@ async function buildShell() {
 
   window.__masna3iEnhanceShell?.();
 
-  document.querySelectorAll('[data-nav]').forEach((button) => {
-    button.addEventListener('click', () => {
-      const key = button.dataset.nav;
-      location.hash = key;
-    });
-  });
+  bindNavigation();
   document.getElementById('refresh').onclick = () => renderRoute(true);
   document.getElementById('logout').onclick = async () => { await client.auth.signOut(); await route(); };
 }
@@ -1077,8 +1072,21 @@ function bindMoneyAccountActions() {
 
 bindMoneyAccountActions();
 
+function bindNavigation() {
+  if (document.documentElement.dataset.navigationBound === 'true') return;
+  document.documentElement.dataset.navigationBound = 'true';
+  document.addEventListener('click', (event) => {
+    const button = event.target.closest?.('[data-nav]');
+    if (!button) return;
+    const key = button.dataset.nav;
+    if (!key) return;
+    event.preventDefault();
+    location.hash = key;
+  });
+}
+
 function bindInnerNav() {
-  document.querySelectorAll('[data-nav]').forEach((button) => button.addEventListener('click', () => { location.hash = button.dataset.nav; }));
+  bindNavigation();
 }
 
 async function route() {
