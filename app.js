@@ -75,25 +75,30 @@ function restoreDraft(form) {
 function enableDraftPersistence() {
   if (document.documentElement.dataset.draftPersistence === 'true') return;
   document.documentElement.dataset.draftPersistence = 'true';
-  const capture = (event) => { const form = event.target.closest?.('form'); if (form) saveDraft(form); };
+
+  const capture = (event) => {
+    const form = event.target.closest?.('form');
+    if (form) saveDraft(form);
+  };
+  const restoreOnFocus = (event) => {
+    const form = event.target.closest?.('form');
+    if (form) restoreDraft(form);
+  };
+
   document.addEventListener('input', capture, true);
   document.addEventListener('change', capture, true);
+  document.addEventListener('focusin', restoreOnFocus, true);
   document.addEventListener('submit', (event) => {
     const form = event.target.closest?.('form');
     const key = draftKey(form);
     if (!key) return;
-    setTimeout(() => { if (!form.isConnected) { try { localStorage.removeItem(key); } catch (_) {} } }, 2500);
-  }, true);
-  const observer = new MutationObserver((mutations) => {
-    for (const mutation of mutations) {
-      for (const node of mutation.addedNodes) {
-        if (node.nodeType !== 1) continue;
-        if (node.matches?.('form:not([data-draft-restored])')) restoreDraft(node);
-        node.querySelectorAll?.('form:not([data-draft-restored])').forEach(restoreDraft);
+    setTimeout(() => {
+      if (!form.isConnected) {
+        try { localStorage.removeItem(key); } catch (_) {}
       }
-    }
-  });
-  observer.observe(document.body, { childList: true, subtree: true });
+    }, 2500);
+  }, true);
+
   document.querySelectorAll('form').forEach(restoreDraft);
 }
 function setStatus(text, kind = '') {
@@ -176,6 +181,8 @@ async function buildShell() {
         <section id="view" class="view"></section>
       </main>
     </div>`;
+
+  window.__masna3iEnhanceShell?.();
 
   document.querySelectorAll('[data-nav]').forEach((button) => {
     button.addEventListener('click', () => {
@@ -855,6 +862,7 @@ async function suppliersView() {
   const suppliers = await fetchOne('suppliers', 'id,name,phone,notes');
   const rows = suppliers.map(s => `<tr><td><b>${escapeHtml(s.name)}</b></td><td>${escapeHtml(s.phone || '—')}</td><td>${escapeHtml(s.notes || '—')}</td><td><button class="table-button" data-account-statement="${escapeHtml(s.id)}" data-account-type="supplier">كشف الحساب</button></td></tr>`);
   document.getElementById('view').innerHTML = `<div class="hero"><div><h2>الموردين</h2><p>إدارة بيانات الموردين المستخدمة في المشتريات ومدفوعاتهم ومرتجعاتهم.</p></div><div class="hero-actions"><button class="button secondary" data-open-supplier-return>↩ مرتجع شراء</button><button class="button" data-add-supplier>＋ إضافة مورد</button></div></div><div class="panel">${table(['اسم المورد','الهاتف','ملاحظات','الحساب'], rows, 'لا يوجد موردون مسجلون حتى الآن.')}</div><div class="panel" id="supplierReturnsPanel" style="margin-top:14px"><div class="empty-state"><b>جارٍ تحميل مرتجعات الموردين…</b></div></div>`;
+  window.__masna3iRenderSupplierReturnsPanel?.();
 }
 
 async function accountsView() {
@@ -952,7 +960,15 @@ async function renderRoute() {
   setActiveNav(key);
   const loaders = { dashboard, models: modelsView, 'model-detail': modelDetailView, inventory: inventoryView, purchases: purchasesView, cutting: cuttingView, wip: wipView, ready: readyView, sales: salesView, invoices: invoicesView, collections: collectionsView, expenses: expensesView, returns: returnsView, accounts: accountsView, customers: customersView, 'supplier-payments': supplierPaymentsView, suppliers: suppliersView, reports: reportsView };
   const loader = loaders[key] || dashboard;
-  try { setStatus('جارٍ تحميل البيانات…'); await loader(); setStatus(''); } catch (error) { console.error(error); setStatus(`تعذر تحميل الشاشة: ${error.message}`, 'error'); }
+  try {
+    setStatus('جارٍ تحميل البيانات…');
+    await loader();
+    document.querySelectorAll('form:not([data-draft-restored])').forEach(restoreDraft);
+    setStatus('');
+  } catch (error) {
+    console.error(error);
+    setStatus(`تعذر تحميل الشاشة: ${error.message}`, 'error');
+  }
 }
 
 function openMoneyAccountModal() {
