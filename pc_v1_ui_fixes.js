@@ -58,6 +58,21 @@
     });
   }
 
+  let navigationTimer = null;
+  document.addEventListener('click', (event) => {
+    const button = event.target.closest?.('[data-nav]');
+    if (!button) return;
+    const key = button.dataset.nav;
+    if (!key) return;
+
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    clearTimeout(navigationTimer);
+    navigationTimer = window.setTimeout(() => {
+      if (location.hash !== '#' + key) location.hash = key;
+    }, 60);
+  }, true);
+
   document.addEventListener('input', (event) => {
     if (event.target?.id === 'modelSearch') applyModelFilter();
   }, true);
