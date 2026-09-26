@@ -81,7 +81,7 @@
         <div class="panel note-panel">
           <h3>لا يوجد حساب نقدية/بنك</h3>
           <p>لا يمكن ترحيل مصروف بدون حساب دفع. أنشئ الحساب من شاشة الحسابات ثم أضف الرصيد الافتتاحي من مسار الإعداد.</p>
-          <button class="button secondary" data-nav="accounts">فتح الحسابات</button>
+          <button class="button secondary" data-add-money-account>＋ إنشاء حساب نقدية / بنك</button>
         </div>` : ''}
 
       <div class="two-col">
