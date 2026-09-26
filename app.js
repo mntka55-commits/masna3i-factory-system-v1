@@ -27,6 +27,10 @@ const NAV = [
 const state = { membership: null, factory: null, user: null, modelId: null };
 let routeInFlight = null;
 const DRAFT_PREFIX = 'masna3i:draft:v1:';
+const READ_CACHE = new Map();
+const READ_CACHE_TTL = 4000;
+let renderToken = 0;
+
 const currency = new Intl.NumberFormat('en-US', { maximumFractionDigits: 2 });
 const number = new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 });
 const money = (value) => `${currency.format(Number(value || 0))} ج`;
@@ -161,9 +165,21 @@ function onboardingScreen() {
 }
 
 async function fetchOne(table, select = '*') {
+  const key = `${table}|${select}`;
+  const cached = READ_CACHE.get(key);
+  const now = Date.now();
+  if (cached && (now - cached.at) < READ_CACHE_TTL) return cached.data;
+
   const { data, error } = await client.from(table).select(select);
   if (error) throw error;
-  return data || [];
+
+  const rows = data || [];
+  READ_CACHE.set(key, { at: now, data: rows });
+  return rows;
+}
+
+function clearReadCache() {
+  READ_CACHE.clear();
 }
 
 async function buildShell() {
@@ -244,29 +260,93 @@ async function modelsView() {
     fetchOne('v_model_current_costs', 'model_id,current_cost_per_piece,fabric_cost_per_piece,variable_cost_per_piece,cutting_operation_id'),
   ]);
 
-  const wipByModel = new Map(wip.map((row) => [row.model_id, row.wip_pieces]));
-  const readyByModel = new Map(ready.map((row) => [row.model_id, row.ready_pieces]));
+  const wipByModel = new Map(wip.map((row) => [row.model_id, Number(row.wip_pieces || 0)]));
+  const readyByModel = new Map(ready.map((row) => [row.model_id, Number(row.ready_pieces || 0)]));
   const costByModel = new Map(costs.map((row) => [row.model_id, row]));
+  const viewNode = document.getElementById('view');
+  const filterState = { query: '', filter: 'all' };
 
-  const rows = models.map((m) => {
+  const rowForModel = (m) => {
     const c = costByModel.get(m.id);
-    const w = Number(wipByModel.get(m.id) || 0);
-    const r = Number(readyByModel.get(m.id) || 0);
-    return `<tr><td><b>${escapeHtml(m.code)}</b></td><td>${escapeHtml(m.name)}</td><td>${qty(w)}</td><td>${qty(r)}</td><td>${c ? money(c.current_cost_per_piece) : '—'}</td><td>${c ? 'آخر قصة مكتملة' : 'لم تُقص بعد'}</td><td><button class="table-button" data-model="${m.id}">التفاصيل</button></td></tr>`;
-  });
+    const w = wipByModel.get(m.id) || 0;
+    const r = readyByModel.get(m.id) || 0;
+    return `<tr>
+      <td><b>${escapeHtml(m.code)}</b></td>
+      <td>${escapeHtml(m.name)}</td>
+      <td>${qty(w)}</td>
+      <td>${qty(r)}</td>
+      <td>${c ? money(c.current_cost_per_piece) : '—'}</td>
+      <td>${c ? 'آخر قصة مكتملة' : 'لم تُقص بعد'}</td>
+      <td><button class="table-button" data-model="${m.id}">التفاصيل</button></td>
+    </tr>`;
+  };
 
-  document.getElementById('view').innerHTML = `
+  const renderModelRows = () => {
+    const query = filterState.query.trim().toLocaleLowerCase('ar');
+    const filtered = models.filter((m) => {
+      const w = wipByModel.get(m.id) || 0;
+      const r = readyByModel.get(m.id) || 0;
+      const haystack = `${m.code || ''} ${m.name || ''}`.toLocaleLowerCase('ar');
+      const matchesQuery = !query || haystack.includes(query);
+      const matchesFilter =
+        filterState.filter === 'all' ||
+        (filterState.filter === 'wip' && w > 0) ||
+        (filterState.filter === 'ready' && r > 0);
+      return matchesQuery && matchesFilter;
+    });
+
+    const body = document.getElementById('modelsTableBody');
+    if (!body) return;
+    body.innerHTML = filtered.length
+      ? filtered.map(rowForModel).join('')
+      : `<tr><td colspan="7"><div class="empty-state compact"><b>لا توجد نتائج مطابقة</b><span>غيّر كلمة البحث أو حالة العرض.</span></div></td></tr>`;
+
+    viewNode.querySelectorAll('[data-model-filter]').forEach((button) => {
+      const active = button.dataset.modelFilter === filterState.filter;
+      button.classList.toggle('active', active);
+      button.setAttribute('aria-pressed', active ? 'true' : 'false');
+    });
+  };
+
+  viewNode.innerHTML = `
     <div class="hero"><div><h2>الموديلات</h2><p>تعريف ومتابعة تكلفة وإنتاج كل موديل.</p></div><button class="button">＋ إضافة موديل</button></div>
     <div class="toolbar">
-      <input id="modelSearch" placeholder="⌕ ابحث باسم الموديل أو الكود" />
-      <div class="filter-chips">
-        <span class="chip active">الكل</span>
-        <span class="chip">قيد الإنتاج</span>
-        <span class="chip">جاهز</span>
+      <input id="modelSearch" aria-label="البحث في الموديلات" placeholder="⌕ ابحث باسم الموديل أو الكود" autocomplete="off" />
+      <div class="filter-chips" role="group" aria-label="تصفية الموديلات">
+        <button type="button" class="chip active" data-model-filter="all" aria-pressed="true">الكل</button>
+        <button type="button" class="chip" data-model-filter="wip" aria-pressed="false">قيد الإنتاج</button>
+        <button type="button" class="chip" data-model-filter="ready" aria-pressed="false">جاهز</button>
       </div>
     </div>
-    <div class="panel">${table(['الكود','الموديل','WIP','READY','تكلفة القطعة الحالية','المصدر','الإجراء'], rows, 'لا توجد موديلات مسجلة حتى الآن.')}</div>`;
-  document.querySelectorAll('[data-model]').forEach((b) => b.addEventListener('click', () => { state.modelId = b.dataset.model; location.hash = 'model-detail'; }));
+    <div class="panel">
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>الكود</th><th>الموديل</th><th>WIP</th><th>READY</th><th>تكلفة القطعة الحالية</th><th>المصدر</th><th>الإجراء</th></tr></thead>
+          <tbody id="modelsTableBody"></tbody>
+        </table>
+      </div>
+    </div>`;
+
+  renderModelRows();
+
+  viewNode.querySelector('#modelSearch')?.addEventListener('input', (event) => {
+    filterState.query = event.currentTarget.value || '';
+    renderModelRows();
+  });
+
+  viewNode.querySelectorAll('[data-model-filter]').forEach((button) => {
+    button.addEventListener('click', () => {
+      filterState.filter = button.dataset.modelFilter || 'all';
+      renderModelRows();
+    });
+  });
+
+  viewNode.addEventListener('click', (event) => {
+    const button = event.target.closest('[data-model]');
+    if (!button) return;
+    state.modelId = button.dataset.model;
+    location.hash = 'model-detail';
+  });
 }
 
 async function modelDetailView() {
@@ -949,18 +1029,46 @@ async function cuttingView() {
   document.getElementById('cutStart').onclick = () => setStatus('واجهة G7 جاهزة. ربط حفظ قصة القص بالـRPC التشغيلي سيتم بعد تثبيت واجهة G7.', 'info');
 }
 
-async function renderRoute() {
+async function renderRoute(force = false) {
+  const token = ++renderToken;
+  if (force) clearReadCache();
+
   const key = location.hash.replace('#','') || 'dashboard';
   if (!document.getElementById('view')) await buildShell();
+  if (token !== renderToken) return;
   setActiveNav(key);
-  const loaders = { dashboard, models: modelsView, 'model-detail': modelDetailView, inventory: inventoryView, purchases: purchasesView, cutting: cuttingView, wip: wipView, ready: readyView, sales: salesView, invoices: invoicesView, collections: collectionsView, expenses: expensesView, returns: returnsView, accounts: accountsView, customers: customersView, 'supplier-payments': supplierPaymentsView, suppliers: suppliersView, reports: reportsView };
+
+  const loaders = {
+    dashboard,
+    models: modelsView,
+    'model-detail': modelDetailView,
+    inventory: inventoryView,
+    purchases: purchasesView,
+    cutting: cuttingView,
+    wip: wipView,
+    ready: readyView,
+    sales: salesView,
+    invoices: invoicesView,
+    collections: collectionsView,
+    expenses: expensesView,
+    returns: returnsView,
+    accounts: accountsView,
+    'opening-setup': openingSetupView,
+    customers: customersView,
+    'supplier-payments': supplierPaymentsView,
+    suppliers: suppliersView,
+    reports: reportsView,
+  };
   const loader = loaders[key] || dashboard;
+
   try {
     setStatus('جارٍ تحميل البيانات…');
     await loader();
+    if (token !== renderToken) return;
     document.querySelectorAll('form:not([data-draft-restored])').forEach(restoreDraft);
     setStatus('');
   } catch (error) {
+    if (token !== renderToken) return;
     console.error(error);
     setStatus(`تعذر تحميل الشاشة: ${error.message}`, 'error');
   }
