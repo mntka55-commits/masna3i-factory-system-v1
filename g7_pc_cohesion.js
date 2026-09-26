@@ -4,7 +4,7 @@
     { label: 'الإنتاج', ids: ['models', 'cutting', 'wip', 'ready'] },
     { label: 'المخزون والشراء', ids: ['inventory', 'purchases'] },
     { label: 'المبيعات والتحصيل', ids: ['sales', 'invoices', 'collections', 'returns'] },
-    { label: 'الحسابات والتقارير', ids: ['accounts', 'customers', 'suppliers', 'reports'] },
+    { label: 'الحسابات والتقارير', ids: ['accounts', 'opening-setup', 'customers', 'suppliers', 'supplier-payments', 'reports'] },
   ];
 
   function enhanceShell() {
