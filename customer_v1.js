@@ -93,4 +93,31 @@
   }, true);
 
   window.__openCustomerModal = openCustomerModal;
+
+  async function customersView() {
+    const [customers, balances] = await Promise.all([
+      fetchOne('customers', 'id,code,name,phone,address'),
+      fetchOne('v_customer_account_balances', 'customer_id,amount_due,customer_credit'),
+    ]);
+    const balanceMap = new Map(balances.map((b) => [b.customer_id, b]));
+    const rows = customers.map(c => {
+      const b = balanceMap.get(c.id) || {};
+      const due = Number(b.amount_due || 0);
+      const credit = Number(b.customer_credit || 0);
+      return `<tr>
+        <td><b>${escapeHtml(c.code || '—')}</b></td>
+        <td><b>${escapeHtml(c.name)}</b></td>
+        <td>${escapeHtml(c.phone || '—')}</td>
+        <td>${money(due)}</td>
+        <td>${money(credit)}</td>
+        <td>
+          <button class="table-button" data-account-statement="${escapeHtml(c.id)}" data-account-type="customer">فتح الحساب</button>
+          ${due > 0 ? `<button class="table-button" data-collect-customer="${escapeHtml(c.id)}">تحصيل</button>` : ''}
+        </td>
+      </tr>`;
+    });
+    document.getElementById('view').innerHTML = `<div class="hero"><div><h2>العملاء</h2><p>حساب كل عميل يجمع فواتيره وتحصيلاته ومرتجعاته في مكان واحد.</p></div><button class="button" data-add-customer>＋ إضافة عميل</button></div><div class="panel">${table(['الكود','اسم العميل','الهاتف','المطلوب','لصالح العميل','الحساب'], rows, 'لا يوجد عملاء مسجلون حتى الآن.')}</div>`;
+    bindInnerNav();
+  }
+  window.customersView = customersView;
 })();
