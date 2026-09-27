@@ -10,7 +10,7 @@
   function enhanceShell() {
     const nav = document.querySelector('.sidebar nav');
     if (!nav) return;
-    const expected = ['dashboard','models','cutting','wip','ready','inventory','purchases','sales','invoices','collections','returns','accounts','customers','suppliers','reports'];
+    const expected = ['dashboard','models','cutting','wip','ready','inventory','purchases','sales','invoices','collections','expenses','returns','accounts','opening-setup','customers','suppliers','supplier-payments','reports'];
     const existing = new Map([...nav.querySelectorAll('.nav-item')].map((button) => [button.dataset.nav, button]));
     expected.forEach((id) => { if (!existing.has(id)) { const button = document.querySelector(`.nav-item[data-nav="${id}"]`); if (button) existing.set(id, button); } });
 
