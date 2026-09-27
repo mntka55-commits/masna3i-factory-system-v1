@@ -205,7 +205,9 @@
     });
   }
 
-  // Event delegation makes the action independent of render timing and MutationObserver races.
+  window.modelsView = modelsView;
+
+  // Event delegation keeps the action independent of render timing.
   document.addEventListener('click', (event) => {
     const addButton = event.target.closest('.hero .button');
     if (!addButton || !addButton.textContent.includes('إضافة موديل')) return;
