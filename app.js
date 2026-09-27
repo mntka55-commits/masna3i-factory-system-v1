@@ -1022,12 +1022,6 @@ async function reportsView() {
   document.getElementById('view').innerHTML = `<div class="hero"><div><h2>التقارير</h2><p>تقارير مشتقة من الحركات الأصلية، وليست مصدر الحقيقة.</p></div></div><div class="stats-grid">${statCard('↗','المبيعات',money(sales),'إجمالي الفواتير')}${statCard('✓','التحصيلات',money(collected),'تحصيلات فعلية')}${statCard('◈','READY',qty(readyTotal),'قطعة')}${statCard('▤','WIP',qty(wipTotal),'قطعة')}</div><div class="two-col"><div class="panel"><h3>تفصيل التكاليف</h3><div class="report-line"><span>التكاليف الثابتة</span><b>${money(fixedTotal)}</b></div><div class="report-line"><span>التكلفة المتغيرة المسجلة للقص</span><b>${money(variableTotal)}</b></div><div class="report-line total"><span>الإجمالي</span><b>${money(fixedTotal + variableTotal)}</b></div></div><div class="panel note-panel"><h3>تنبيه محاسبي</h3><p>لا يتم عرض «صافي الربح» كحساب V1 معتمد هنا. التكاليف المتغيرة والثابتة تظل منفصلة حسب الـCanonical Master.</p></div></div>`;
 }
 
-async function cuttingView() {
-  const [models, inventory] = await Promise.all([fetchOne('models', 'id,code,name'), fetchOne('v_inventory_balances', 'material_id,name,code,unit,current_quantity,kind')]);
-  const fabric = inventory.filter((x)=>x.kind==='fabric');
-  document.getElementById('view').innerHTML = `<div class="hero"><div><h2>القص والإنتاج</h2><p>القص الفعلي من الخامة حتى دخول WIP.</p></div></div><div class="steps"><span class="done">1 اختيار الموديل</span><span class="done">2 الخامة الفعلية</span><span>3 القطع الفعلية</span><span>4 دخول WIP</span></div><div class="two-col"><div class="panel form-panel"><h3>قصة قص جديدة</h3><div class="rule-box">بدء القص يعتمد على الأمتار الفعلية الداخلة للقص فقط — لا يوجد حقل لعدد قطع متوقع.</div><label>الموديل<select><option value="">اختر الموديل</option>${models.map(m=>`<option>${escapeHtml(m.code)} — ${escapeHtml(m.name)}</option>`).join('')}</select></label><label>الخامة<select><option value="">اختر القماش</option>${fabric.map(m=>`<option>${escapeHtml(m.code)} — ${escapeHtml(m.name)}</option>`).join('')}</select></label><label>الكمية الفعلية الداخلة<input type="number" min="0" step="0.01" placeholder="مثال: 150" /></label><button class="button" id="cutStart">حفظ بدء القص</button></div><div class="panel note-panel"><h3>قواعد القص المثبتة</h3><p>• القصة تخص موديلًا واحدًا.</p><p>• يمكن استخدام أكثر من خامة في نفس القصة.</p><p>• عند بدء القص يتم خصم الأمتار الفعلية من المخزن بصورة ذرية.</p><p>• نهاية القصة تسجل الأمتار الفعلية + القطع الفعلية، ثم يدخل الناتج WIP.</p></div></div>`;
-  document.getElementById('cutStart').onclick = () => setStatus('واجهة G7 جاهزة. ربط حفظ قصة القص بالـRPC التشغيلي سيتم بعد تثبيت واجهة G7.', 'info');
-}
 
 async function renderRoute(force = false) {
   const token = ++renderToken;
@@ -1041,10 +1035,10 @@ async function renderRoute(force = false) {
   const loaders = {
     dashboard,
     models: modelsView,
-    'model-detail': modelDetailView,
+    'model-detail': window.modelDetailView || dashboard,
     inventory: inventoryView,
     purchases: purchasesView,
-    cutting: cuttingView,
+    cutting: window.cuttingView || dashboard,
     wip: wipView,
     ready: readyView,
     sales: salesView,
@@ -1074,111 +1068,6 @@ async function renderRoute(force = false) {
   }
 }
 
-function openMoneyAccountModal() {
-  document.getElementById('moneyAccountModal')?.remove();
-  const modal = document.createElement('div');
-  modal.className = 'modal-backdrop';
-  modal.id = 'moneyAccountModal';
-  modal.innerHTML = `
-    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="moneyAccountTitle">
-      <div class="modal-head">
-        <div><span class="eyebrow">حسابات المصنع</span><h3 id="moneyAccountTitle">إضافة حساب نقدية / بنك</h3></div>
-        <button type="button" class="modal-close" data-close-money-account>×</button>
-      </div>
-      <form id="moneyAccountForm" class="stack-form">
-        <label>اسم الحساب
-          <input id="moneyAccountName" required maxlength="120" placeholder="مثال: خزينة المصنع" />
-        </label>
-        <label>نوع الحساب
-          <select id="moneyAccountKind" required>
-            <option value="cash">نقدية</option>
-            <option value="bank">بنك</option>
-          </select>
-        </label>
-        <small class="field-help">الحساب الجديد يبدأ بحالة نشطة، ويمكن تعطيله أو تفعيله لاحقًا من شاشة الحسابات.</small>
-        <div class="modal-actions">
-          <button type="button" class="button secondary" data-close-money-account>إلغاء</button>
-          <button type="submit" class="button" id="saveMoneyAccount">حفظ الحساب</button>
-        </div>
-        <div class="global-status" id="moneyAccountStatus"></div>
-      </form>
-    </div>`;
-  document.body.appendChild(modal);
-
-  const close = () => modal.remove();
-  modal.querySelectorAll('[data-close-money-account]').forEach((button) => button.addEventListener('click', close));
-  modal.addEventListener('click', (event) => { if (event.target === modal) close(); });
-
-  modal.querySelector('#moneyAccountForm').addEventListener('submit', async (event) => {
-    event.preventDefault();
-    const button = modal.querySelector('#saveMoneyAccount');
-    const status = modal.querySelector('#moneyAccountStatus');
-    const name = modal.querySelector('#moneyAccountName').value.trim();
-    const kind = modal.querySelector('#moneyAccountKind').value;
-    if (!name) { status.textContent = 'اسم الحساب مطلوب.'; return; }
-    if (!['cash', 'bank'].includes(kind)) { status.textContent = 'نوع الحساب غير صحيح.'; return; }
-
-    button.disabled = true;
-    button.textContent = 'جارٍ الحفظ…';
-    status.textContent = '';
-
-    const { error } = await client
-      .from('money_accounts')
-      .insert({ name, kind, active: true });
-
-    if (error) {
-      status.textContent = `تعذر إنشاء الحساب: ${error.message}`;
-      button.disabled = false;
-      button.textContent = 'حفظ الحساب';
-      return;
-    }
-
-    close();
-    setStatus('تم إنشاء الحساب وتفعيله بنجاح.', 'info');
-    await renderRoute(true);
-  });
-}
-
-function bindMoneyAccountActions() {
-  if (document.documentElement.dataset.moneyAccountActions === 'true') return;
-  document.documentElement.dataset.moneyAccountActions = 'true';
-
-  document.addEventListener('click', async (event) => {
-    const addButton = event.target.closest('[data-add-money-account]');
-    if (addButton) {
-      event.preventDefault();
-      event.stopPropagation();
-      openMoneyAccountModal();
-      return;
-    }
-
-    const toggleButton = event.target.closest('[data-toggle-money-account]');
-    if (!toggleButton) return;
-
-    event.preventDefault();
-    event.stopPropagation();
-    const accountId = toggleButton.dataset.toggleMoneyAccount;
-    const nextActive = toggleButton.dataset.nextActive === 'true';
-    if (!accountId) return;
-
-    toggleButton.disabled = true;
-    const { error } = await client
-      .from('money_accounts')
-      .update({ active: nextActive })
-      .eq('id', accountId);
-
-    if (error) {
-      toggleButton.disabled = false;
-      setStatus(`تعذر ${nextActive ? 'تفعيل' : 'تعطيل'} الحساب: ${error.message}`, 'error');
-      return;
-    }
-
-    setStatus(nextActive ? 'تم تفعيل الحساب.' : 'تم تعطيل الحساب.', 'info');
-    await renderRoute(true);
-  });
-}
-
-bindMoneyAccountActions();
 
 function bindNavigation() {
   if (document.documentElement.dataset.navigationBound === 'true') return;
