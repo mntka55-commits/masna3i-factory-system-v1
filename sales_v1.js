@@ -165,4 +165,13 @@
     event.stopPropagation();
     openSaleModal();
   }, true);
+
+  async function salesView() {
+    const invoices = await fetchOne('v_invoice_totals', 'invoice_id,invoice_number,invoice_date,customer_id,invoice_total');
+    const customers = await fetchOne('customers', 'id,name');
+    const tr = invoices.map((r) => `<tr><td>${escapeHtml(r.invoice_number)}</td><td>${escapeHtml(customers.find((c)=>c.id===r.customer_id)?.name || '—')}</td><td>${escapeHtml(r.invoice_date)}</td><td>${money(r.invoice_total)}</td><td><button class="table-button" data-invoice="${r.invoice_id}">الفاتورة</button></td></tr>`);
+    document.getElementById('view').innerHTML = `<div class="hero"><div><h2>المبيعات</h2><p>بيع من READY فقط — البيع الجزئي ومتعدد الموديلات.</p></div><button class="button">＋ بيع جديد</button></div><div class="panel purchase-note"><b>قاعدة تشغيلية:</b> الفاتورة تُنشأ مع البيع، ويمكن أن تحتوي على أكثر من موديل.</div><div class="panel">${table(['الفاتورة','العميل','التاريخ','الإجمالي',''], tr, 'لا توجد مبيعات حتى الآن.')}</div>`;
+    document.querySelectorAll('[data-invoice]').forEach((b)=>b.addEventListener('click',()=>{ location.hash='invoices'; state.invoiceId=b.dataset.invoice; renderRoute(); }));
+  }
+  window.salesView = salesView;
 })();
