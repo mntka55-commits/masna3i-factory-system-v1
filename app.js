@@ -32,6 +32,33 @@ const NAV_GROUPS = [
   { label: 'الحسابات والتقارير', ids: ['accounts', 'opening-setup', 'customers', 'suppliers', 'supplier-payments', 'expenses', 'reports'] },
 ];
 
+const ROUTES = {
+  dashboard: 'dashboardView',
+  models: 'modelsView',
+  'model-detail': 'modelDetailView',
+  inventory: 'inventoryView',
+  purchases: 'purchasesView',
+  cutting: 'cuttingView',
+  wip: 'wipView',
+  ready: 'readyView',
+  sales: 'salesView',
+  invoices: 'invoicesView',
+  collections: 'collectionsView',
+  expenses: 'expensesView',
+  returns: 'returnsView',
+  accounts: 'accountsView',
+  'opening-setup': 'openingSetupView',
+  customers: 'customersView',
+  'supplier-payments': 'supplierPaymentsView',
+  suppliers: 'suppliersView',
+  reports: 'reportsView',
+};
+
+function resolveRoute(key) {
+  const name = ROUTES[key];
+  return name ? window[name] : null;
+}
+
 const state = { membership: null, factory: null, user: null, modelId: null };
 let routeInFlight = null;
 const DRAFT_PREFIX = 'masna3i:draft:v1:';
@@ -247,28 +274,11 @@ async function renderRoute(force = false) {
   if (token !== renderToken) return;
   setActiveNav(key);
 
-  const loaders = {
-    dashboard: window.dashboardView,
-    models: window.modelsView || dashboard,
-    'model-detail': window.modelDetailView || dashboard,
-    inventory: window.inventoryView || dashboard,
-    purchases: window.purchasesView || dashboard,
-    cutting: window.cuttingView || dashboard,
-    wip: window.wipView || dashboard,
-    ready: window.readyView || dashboard,
-    sales: window.salesView || dashboard,
-    invoices: window.invoicesView || dashboard,
-    collections: window.collectionsView || dashboard,
-    expenses: window.expensesView || dashboard,
-    returns: window.returnsView || dashboard,
-    accounts: window.accountsView || dashboard,
-    'opening-setup': window.openingSetupView || window.dashboardView,
-    customers: window.customersView || dashboard,
-    'supplier-payments': window.supplierPaymentsView || dashboard,
-    suppliers: window.suppliersView || dashboard,
-    reports: window.reportsView || dashboard,
-  };
-  const loader = loaders[key] || dashboard;
+  const loader = resolveRoute(key);
+  if (typeof loader !== 'function') {
+    setStatus(`الشاشة غير جاهزة: ${key}`, 'error');
+    return;
+  }
 
   try {
     setStatus('جارٍ تحميل البيانات…');
