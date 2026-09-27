@@ -1050,14 +1050,14 @@ async function renderRoute(force = false) {
     sales: salesView,
     invoices: invoicesView,
     collections: collectionsView,
-    expenses: expensesView,
+    expenses: window.expensesView || expensesView,
     returns: returnsView,
     accounts: accountsView,
-    'opening-setup': openingSetupView,
-    customers: customersView,
-    'supplier-payments': supplierPaymentsView,
-    suppliers: suppliersView,
-    reports: reportsView,
+    'opening-setup': window.openingSetupView,
+    customers: window.customersView || customersView,
+    'supplier-payments': window.supplierPaymentsView || supplierPaymentsView,
+    suppliers: window.suppliersView || suppliersView,
+    reports: window.reportsView || reportsView,
   };
   const loader = loaders[key] || dashboard;
 
