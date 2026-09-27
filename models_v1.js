@@ -6,6 +6,103 @@
     return window.__masna3iClient || null;
   }
 
+
+  async function modelsView() {
+    const [models, wip, ready, costs] = await Promise.all([
+      fetchOne('models', 'id,code,name'),
+      fetchOne('v_wip_balances', 'model_id,wip_pieces'),
+      fetchOne('v_ready_balances', 'model_id,ready_pieces'),
+      fetchOne('v_model_current_costs', 'model_id,current_cost_per_piece,fabric_cost_per_piece,variable_cost_per_piece,cutting_operation_id'),
+    ]);
+  
+    const wipByModel = new Map(wip.map((row) => [row.model_id, Number(row.wip_pieces || 0)]));
+    const readyByModel = new Map(ready.map((row) => [row.model_id, Number(row.ready_pieces || 0)]));
+    const costByModel = new Map(costs.map((row) => [row.model_id, row]));
+    const viewNode = document.getElementById('view');
+    const filterState = { query: '', filter: 'all' };
+  
+    const rowForModel = (m) => {
+      const c = costByModel.get(m.id);
+      const w = wipByModel.get(m.id) || 0;
+      const r = readyByModel.get(m.id) || 0;
+      return `<tr>
+        <td><b>${escapeHtml(m.code)}</b></td>
+        <td>${escapeHtml(m.name)}</td>
+        <td>${qty(w)}</td>
+        <td>${qty(r)}</td>
+        <td>${c ? money(c.current_cost_per_piece) : '—'}</td>
+        <td>${c ? 'آخر قصة مكتملة' : 'لم تُقص بعد'}</td>
+        <td><button class="table-button" data-model="${m.id}">التفاصيل</button></td>
+      </tr>`;
+    };
+  
+    const renderModelRows = () => {
+      const query = filterState.query.trim().toLocaleLowerCase('ar');
+      const filtered = models.filter((m) => {
+        const w = wipByModel.get(m.id) || 0;
+        const r = readyByModel.get(m.id) || 0;
+        const haystack = `${m.code || ''} ${m.name || ''}`.toLocaleLowerCase('ar');
+        const matchesQuery = !query || haystack.includes(query);
+        const matchesFilter =
+          filterState.filter === 'all' ||
+          (filterState.filter === 'wip' && w > 0) ||
+          (filterState.filter === 'ready' && r > 0);
+        return matchesQuery && matchesFilter;
+      });
+  
+      const body = document.getElementById('modelsTableBody');
+      if (!body) return;
+      body.innerHTML = filtered.length
+        ? filtered.map(rowForModel).join('')
+        : `<tr><td colspan="7"><div class="empty-state compact"><b>لا توجد نتائج مطابقة</b><span>غيّر كلمة البحث أو حالة العرض.</span></div></td></tr>`;
+  
+      viewNode.querySelectorAll('[data-model-filter]').forEach((button) => {
+        const active = button.dataset.modelFilter === filterState.filter;
+        button.classList.toggle('active', active);
+        button.setAttribute('aria-pressed', active ? 'true' : 'false');
+      });
+    };
+  
+    viewNode.innerHTML = `
+      <div class="hero"><div><h2>الموديلات</h2><p>تعريف ومتابعة تكلفة وإنتاج كل موديل.</p></div><button class="button">＋ إضافة موديل</button></div>
+      <div class="toolbar">
+        <input id="modelSearch" aria-label="البحث في الموديلات" placeholder="⌕ ابحث باسم الموديل أو الكود" autocomplete="off" />
+        <div class="filter-chips" role="group" aria-label="تصفية الموديلات">
+          <button type="button" class="chip active" data-model-filter="all" aria-pressed="true">الكل</button>
+          <button type="button" class="chip" data-model-filter="wip" aria-pressed="false">قيد الإنتاج</button>
+          <button type="button" class="chip" data-model-filter="ready" aria-pressed="false">جاهز</button>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>الكود</th><th>الموديل</th><th>WIP</th><th>READY</th><th>تكلفة القطعة الحالية</th><th>المصدر</th><th>الإجراء</th></tr></thead>
+            <tbody id="modelsTableBody"></tbody>
+          </table>
+        </div>
+      </div>`;
+  
+    renderModelRows();
+  
+    viewNode.querySelector('#modelSearch')?.addEventListener('input', (event) => {
+      filterState.query = event.currentTarget.value || '';
+      renderModelRows();
+    });
+  
+    viewNode.querySelectorAll('[data-model-filter]').forEach((button) => {
+      button.addEventListener('click', () => {
+        filterState.filter = button.dataset.modelFilter || 'all';
+        renderModelRows();
+      });
+    });
+  
+    viewNode.addEventListener('click', (event) => {
+      const button = event.target.closest('[data-model]');
+      if (!button) return;
+      state.modelId = button.dataset.model;
+      location.hash = 'model-detail';
+    });
+  }
   async function createModel(payload) {
     const c = client();
     if (!c) throw new Error('جلسة النظام غير جاهزة.');
