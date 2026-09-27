@@ -855,14 +855,23 @@ async function renderRoute(force = false) {
 function bindNavigation() {
   if (document.documentElement.dataset.navigationBound === 'true') return;
   document.documentElement.dataset.navigationBound = 'true';
+  let navigationTimer = null;
+
   document.addEventListener('click', (event) => {
     const button = event.target.closest?.('[data-nav]');
     if (!button) return;
+
     const key = button.dataset.nav;
     if (!key) return;
+
     event.preventDefault();
-    location.hash = key;
-  });
+    event.stopImmediatePropagation();
+    clearTimeout(navigationTimer);
+
+    navigationTimer = window.setTimeout(() => {
+      if (location.hash !== '#' + key) location.hash = key;
+    }, 60);
+  }, true);
 }
 
 function bindInnerNav() {
