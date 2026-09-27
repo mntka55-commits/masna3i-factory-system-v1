@@ -263,9 +263,7 @@
     }
   }
 
-  const original = window.reportsView;
   window.reportsView = () => render();
-  window.__masna3iOriginalReportsView = original;
 
   if (location.hash.replace('#', '') === 'reports' && document.getElementById('view')) {
     window.reportsView();
