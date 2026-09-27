@@ -24,6 +24,14 @@ const NAV = [
   ['reports', '▰', 'التقارير'],
 ];
 
+const NAV_GROUPS = [
+  { label: 'الرئيسية', ids: ['dashboard'] },
+  { label: 'الإنتاج', ids: ['models', 'cutting', 'wip', 'ready'] },
+  { label: 'المخزون والشراء', ids: ['inventory', 'purchases'] },
+  { label: 'المبيعات والتحصيل', ids: ['sales', 'invoices', 'collections', 'returns'] },
+  { label: 'الحسابات والتقارير', ids: ['accounts', 'opening-setup', 'customers', 'suppliers', 'supplier-payments', 'expenses', 'reports'] },
+];
+
 const state = { membership: null, factory: null, user: null, modelId: null };
 let routeInFlight = null;
 const DRAFT_PREFIX = 'masna3i:draft:v1:';
@@ -184,21 +192,31 @@ function clearReadCache() {
 
 async function buildShell() {
   const email = state.user?.email || '';
+  const navMap = new Map(NAV.map((item) => [item[0], item]));
+  const groupedNav = NAV_GROUPS.map((group, index) => {
+    const items = group.ids
+      .map((id) => navMap.get(id))
+      .filter(Boolean)
+      .map(([id, icon, label]) => `<button class="nav-item" data-nav="${id}"><span>${icon}</span><strong>${label}</strong></button>`)
+      .join('');
+    return `<div class="nav-group${index > 0 ? ' with-divider' : ''}"><div class="nav-group-label">${group.label}</div>${items}</div>`;
+  }).join('');
+
+  const todayLabel = new Intl.DateTimeFormat('ar-EG', { dateStyle: 'medium' }).format(new Date());
+
   app.innerHTML = `
     <div class="app-shell">
       <aside class="sidebar">
         <div class="side-brand"><span class="brand-mark">م</span><div><b>مصنعي</b><small>إدارة أسهل .. إنتاج أفضل</small></div></div>
-        <nav>${NAV.map(([id, icon, label]) => `<button class="nav-item" data-nav="${id}"><span>${icon}</span><strong>${label}</strong></button>`).join('')}</nav>
+        <nav>${groupedNav}</nav>
         <div class="side-footer"><div class="factory-chip"><b>${escapeHtml(state.factory?.name || 'المصنع')}</b><span>${escapeHtml(state.membership?.role || '')}</span></div><button id="logout" class="logout">↪ تسجيل الخروج</button></div>
       </aside>
       <main class="content-shell">
-        <header class="topbar"><div><span class="crumb">مصنعي /</span><h1 id="pageHeading">الرئيسية</h1></div><div class="top-actions"><button id="refresh" class="icon-button" title="تحديث">↻</button><div class="user-chip"><span class="avatar">${escapeHtml((email[0] || 'M').toUpperCase())}</span><div><b>${escapeHtml(email || 'المستخدم')}</b><small>15 سبتمبر 2026</small></div></div></div></header>
+        <header class="topbar"><div><span class="crumb">مصنعي /</span><h1 id="pageHeading">الرئيسية</h1></div><div class="top-actions"><button id="refresh" class="icon-button" title="تحديث">↻</button><div class="user-chip"><span class="avatar">${escapeHtml((email[0] || 'م').toUpperCase())}</span><div><b>${escapeHtml(email || 'المستخدم')}</b><small>${escapeHtml(todayLabel)}</small></div></div></div></header>
         <div class="global-status"></div>
         <section id="view" class="view"></section>
       </main>
     </div>`;
-
-  window.__masna3iEnhanceShell?.();
 
   bindNavigation();
   document.getElementById('refresh').onclick = () => renderRoute(true);
