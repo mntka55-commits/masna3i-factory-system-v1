@@ -204,8 +204,6 @@
     };
   }
 
-  const original=window.returnsView;
   window.returnsView=async()=>{try{render(await load());}catch(e){setStatus(`تعذر تحميل شاشة المرتجعات: ${e.message}`,'error');}};
-  window.__masna3iOriginalReturnsView=original;
   if(location.hash.replace('#','')==='returns'&&document.getElementById('view'))window.returnsView();
 })();
