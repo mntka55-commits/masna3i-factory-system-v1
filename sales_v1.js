@@ -30,7 +30,15 @@
     </div>`;
   }
 
-  async function openSaleModal() {
+  async function openSaleModal(mode = 'normal') {
+    const clearance = mode === 'clearance';
+    const title = clearance ? 'بيع تصفية' : 'بيع جديد';
+    const description = clearance
+      ? 'بيع تصفية من READY فقط، مع حفظ سعر البيع الفعلي وقت العملية.'
+      : 'البيع من READY فقط، والبيع الجزئي ومتعدد الموديلات مسموح.';
+    const submitLabel = clearance ? 'تسجيل بيع التصفية' : 'تسجيل البيع';
+    const rpcName = clearance ? 'post_clearance_sale_and_invoice_v2' : 'post_sale_and_invoice_v2';
+
     let ready;
     try { ready = await loadReadyModels(); } catch (e) { alert(`تعذر تحميل READY: ${e.message}`); return; }
     if (!ready.length) {
@@ -45,7 +53,7 @@
     const modal = document.createElement('div');
     modal.className = 'modal-backdrop sale-modal';
     modal.innerHTML = `<div class="modal-card sale-modal-card" role="dialog" aria-modal="true">
-      <div class="modal-head"><div><h3>بيع جديد</h3><span>البيع من READY فقط، والبيع الجزئي ومتعدد الموديلات مسموح.</span></div><button type="button" class="modal-close" data-close-sale>×</button></div>
+      <div class="modal-head"><div><h3>${title}</h3><span>${description}</span></div><button type="button" class="modal-close" data-close-sale>×</button></div>
       <form id="saleForm" class="modal-form">
         <div class="form-grid">
           <label>رقم الفاتورة<input id="saleInvoice" required maxlength="80" placeholder="مثال: INV-001" /></label>
@@ -73,7 +81,7 @@
         <div id="saleLines">${lineTemplate(ready, 0)}</div>
         <label>ملاحظات<textarea id="saleNotes" rows="2" placeholder="اختياري"></textarea></label>
         <div id="saleStatus" class="modal-status"></div>
-        <div class="modal-actions"><button type="button" class="button secondary" data-close-sale>إلغاء</button><button type="submit" class="button" id="saleSubmit">تسجيل البيع</button></div>
+        <div class="modal-actions"><button type="button" class="button secondary" data-close-sale>إلغاء</button><button type="submit" class="button" id="saleSubmit">${submitLabel}</button></div>
       </form>
     </div>`;
     document.body.appendChild(modal);
@@ -138,7 +146,7 @@
         if (external && !externalName) throw new Error('اكتب اسم العميل الخارجي.');
         const registeredCustomerId = external ? null : (modal.querySelector('#saleCustomer').value || null);
 
-        const { data, error } = await client.rpc('post_sale_and_invoice_v2', {
+        const { data, error } = await client.rpc(rpcName, {
           p_invoice_number: modal.querySelector('#saleInvoice').value.trim(),
           p_sale_date: modal.querySelector('#saleDate').value,
           p_items: pItems,
@@ -148,7 +156,7 @@
         });
         if (error) throw error;
         status.className = 'modal-status success';
-        status.textContent = `تم تسجيل البيع وإصدار الفاتورة بنجاح. رقم العملية: ${data?.invoice_id || 'تم الإنشاء'}`;
+        status.textContent = `تم ${clearance ? 'تسجيل بيع التصفية' : 'تسجيل البيع'} وإصدار الفاتورة بنجاح. رقم العملية: ${data?.invoice_id || 'تم الإنشاء'}`;
         setTimeout(() => { close(); location.hash = 'sales'; location.reload(); }, 700);
       } catch (e) {
         status.className = 'modal-status error';
@@ -159,18 +167,18 @@
   }
 
   document.addEventListener('click', (event) => {
-    const button = event.target.closest('.hero .button');
-    if (!button || !button.textContent.includes('بيع جديد')) return;
+    const button = event.target.closest('.hero .button[data-sale-kind]');
+    if (!button) return;
     event.preventDefault();
     event.stopPropagation();
-    openSaleModal();
+    openSaleModal(button.dataset.saleKind);
   }, true);
 
   async function salesView() {
     const invoices = await fetchOne('v_invoice_totals', 'invoice_id,invoice_number,invoice_date,customer_id,invoice_total');
     const customers = await fetchOne('customers', 'id,name');
     const tr = invoices.map((r) => `<tr><td>${escapeHtml(r.invoice_number)}</td><td>${escapeHtml(customers.find((c)=>c.id===r.customer_id)?.name || '—')}</td><td>${escapeHtml(r.invoice_date)}</td><td>${money(r.invoice_total)}</td><td><button class="table-button" data-invoice="${r.invoice_id}">الفاتورة</button></td></tr>`);
-    document.getElementById('view').innerHTML = `<div class="hero"><div><h2>المبيعات</h2><p>بيع من READY فقط — البيع الجزئي ومتعدد الموديلات.</p></div><button class="button">＋ بيع جديد</button></div><div class="panel purchase-note"><b>قاعدة تشغيلية:</b> الفاتورة تُنشأ مع البيع، ويمكن أن تحتوي على أكثر من موديل.</div><div class="panel">${table(['الفاتورة','العميل','التاريخ','الإجمالي',''], tr, 'لا توجد مبيعات حتى الآن.')}</div>`;
+    document.getElementById('view').innerHTML = `<div class="hero"><div><h2>المبيعات</h2><p>البيع من READY فقط — البيع الجزئي ومتعدد الموديلات.</p></div><div class="button-row"><button class="button" data-sale-kind="normal">＋ بيع جديد</button><button class="button secondary" data-sale-kind="clearance">＋ بيع تصفية</button></div></div><div class="panel purchase-note"><b>قاعدة تشغيلية:</b> الفاتورة تُنشأ مع البيع، ويمكن أن تحتوي على أكثر من موديل.</div><div class="panel">${table(['الفاتورة','العميل','التاريخ','الإجمالي',''], tr, 'لا توجد مبيعات حتى الآن.')}</div>`;
     document.querySelectorAll('[data-invoice]').forEach((b)=>b.addEventListener('click',()=>{ location.hash='invoices'; state.invoiceId=b.dataset.invoice; renderRoute(); }));
   }
   window.salesView = salesView;
