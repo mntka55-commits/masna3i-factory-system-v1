@@ -98,19 +98,8 @@
     chip.click();
   }, true);
 
-  function enforceOpeningSetup() {
-    if (location.hash !== '#opening-setup') return;
-    if (typeof window.openingSetupView !== 'function') return;
-    window.setTimeout(() => {
-      if (location.hash === '#opening-setup') window.openingSetupView();
-    }, 180);
-  }
-
-  window.addEventListener('hashchange', enforceOpeningSetup);
-
   window.setTimeout(() => {
     prepareModelChips();
     applyModelFilter();
-    enforceOpeningSetup();
   }, 0);
 })();
