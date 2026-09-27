@@ -150,9 +150,7 @@
     });
   }
 
-  const original = window.cuttingView;
   window.cuttingView = cuttingView;
-  window.__masna3iOriginalCuttingView = original;
 
   if (location.hash.replace('#', '') === 'cutting' && document.getElementById('view')) cuttingView();
 })();
