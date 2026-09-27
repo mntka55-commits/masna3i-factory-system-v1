@@ -342,6 +342,6 @@ async function route() {
 
 window.addEventListener('hashchange', renderRoute);
 client.auth.onAuthStateChange((event) => {
+  if (!window.__masna3iBooted) return;
   if (event === 'SIGNED_IN' || event === 'SIGNED_OUT' || event === 'USER_UPDATED') route();
 });
-route();
