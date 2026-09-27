@@ -70,4 +70,12 @@
     event.stopPropagation();
     moveToReady(button);
   }, true);
+
+
+  async function wipView() {
+    const rows = await fetchOne('v_wip_balances', 'model_id,model_code,model_name,wip_pieces');
+    const tr = rows.map((r) => `<tr><td><b>${escapeHtml(r.model_code)}</b><br><span class="subtext">${escapeHtml(r.model_name)}</span></td><td>${qty(r.wip_pieces)}</td><td><input class="inline-input" value="0" min="0" type="number" /></td><td><button class="table-button">تحويل إلى READY</button></td></tr>`);
+    document.getElementById('view').innerHTML = `<div class="hero"><div><h2>WIP</h2><p>القطع تحت التجهيز والتحويل إلى READY.</p></div><span class="read-rule">التحويل الجزئي مسموح، ولا يمكن تجاوز المتاح في WIP.</span></div><div class="stats-grid">${statCard('▤','إجمالي WIP',qty(rows.reduce((s,r)=>s+Number(r.wip_pieces||0),0)),'قطعة تحت التجهيز')}${statCard('◈','عدد الموديلات',qty(rows.length),'بها WIP')}</div><div class="panel">${table(['الموديل','WIP','تحويل مقترح','الإجراء'], tr, 'لا توجد قطع تحت التجهيز حتى الآن.')}</div>`;
+  }
+  window.wipView = wipView;
 })();
