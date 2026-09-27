@@ -273,25 +273,7 @@ async function dashboard() {
 
 
 
-async function purchasesView() {
-  const [purchases, suppliers, totals] = await Promise.all([
-    fetchOne('purchase_invoices', 'id,invoice_number,supplier_id,purchase_date,created_at'),
-    fetchOne('suppliers', 'id,name'),
-    fetchOne('v_purchase_totals', 'purchase_invoice_id,total_amount'),
-  ]);
-  const rows = purchases.map((p) => `<tr><td>${escapeHtml(p.invoice_number)}</td><td>${escapeHtml(suppliers.find((s)=>s.id===p.supplier_id)?.name || '—')}</td><td>${escapeHtml(p.purchase_date)}</td><td>${money(totals.find((t)=>t.purchase_invoice_id===p.id)?.total_amount)}</td><td><button class="table-button">التفاصيل</button></td></tr>`);
-  document.getElementById('view').innerHTML = `<div class="hero"><div><h2>المشتريات</h2><p>الشراء يزيد المخزون ويسجل حركة المورد — ليس مصروف تشغيل.</p></div><button class="button">＋ شراء جديد</button></div><div class="panel purchase-note"><b>قاعدة تشغيلية:</b> الشراء يدخل المخزون ويحفظ سعره التاريخي لكل سطر شراء.</div><div class="panel">${table(['رقم الفاتورة','المورد','التاريخ','الإجمالي','الإجراء'], rows, 'لا توجد فواتير شراء حتى الآن.')}</div>`;
-}
 
-
-
-async function salesView() {
-  const invoices = await fetchOne('v_invoice_totals', 'invoice_id,invoice_number,invoice_date,customer_id,invoice_total');
-  const customers = await fetchOne('customers', 'id,name');
-  const tr = invoices.map((r) => `<tr><td>${escapeHtml(r.invoice_number)}</td><td>${escapeHtml(customers.find((c)=>c.id===r.customer_id)?.name || '—')}</td><td>${escapeHtml(r.invoice_date)}</td><td>${money(r.invoice_total)}</td><td><button class="table-button" data-invoice="${r.invoice_id}">الفاتورة</button></td></tr>`);
-  document.getElementById('view').innerHTML = `<div class="hero"><div><h2>المبيعات</h2><p>بيع من READY فقط — البيع الجزئي ومتعدد الموديلات.</p></div><button class="button">＋ بيع جديد</button></div><div class="panel purchase-note"><b>قاعدة تشغيلية:</b> الفاتورة تُنشأ مع البيع، ويمكن أن تحتوي على أكثر من موديل.</div><div class="panel">${table(['الفاتورة','العميل','التاريخ','الإجمالي',''], tr, 'لا توجد مبيعات حتى الآن.')}</div>`;
-  document.querySelectorAll('[data-invoice]').forEach((b)=>b.addEventListener('click',()=>{ location.hash='invoices'; state.invoiceId=b.dataset.invoice; renderRoute(); }));
-}
 
 async function invoicesView() {
   const [balances, customers] = await Promise.all([
@@ -672,11 +654,11 @@ async function renderRoute(force = false) {
     models: window.modelsView || dashboard,
     'model-detail': window.modelDetailView || dashboard,
     inventory: window.inventoryView || dashboard,
-    purchases: purchasesView,
+    purchases: window.purchasesView || dashboard,
     cutting: window.cuttingView || dashboard,
     wip: window.wipView || dashboard,
     ready: window.readyView || dashboard,
-    sales: salesView,
+    sales: window.salesView || dashboard,
     invoices: invoicesView,
     collections: collectionsView,
     expenses: window.expensesView || dashboard,
