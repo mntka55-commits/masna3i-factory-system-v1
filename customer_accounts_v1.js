@@ -135,7 +135,7 @@
 
         <div class="panel" style="margin-bottom:14px">
           <div class="panel-head">
-            <div><h3>الفواتير</h3><span>الفواتير مرتبطة بهذا العميل فقط، والمتبقي هو الحد الفعلي للتحصيل.</span></div>
+            <div><h3>الفواتير</h3><span>الفواتير مستندات للمراجعة، أما الرصيد الفعلي والتحصيل فيُحسبان على حساب العميل.</span></div>
           </div>
           <div id="customerInvoices"></div>
         </div>
@@ -182,12 +182,7 @@
     const pane = modal.querySelector('#customerCollectionPane');
     const renderCollectionPane = () => {
       if (!activeAccounts.length) {
-        pane.innerHTML = `
-          <div class="panel note-panel">
-            <h3>الحساب النقدي / البنكي غير جاهز</h3>
-            <p>لا يوجد حساب نشط لاستلام التحصيل. أنشئ الحساب هنا وسيظهر مباشرة في نفس العملية.</p>
-            <button type="button" class="button" id="createAccountFromCustomerCollection">＋ إنشاء حساب نقدية / بنك</button>
-          </div>`;
+        pane.innerHTML = '<div class="panel note-panel"><h3>الحساب النقدي / البنكي غير جاهز</h3><p>لا يوجد حساب نشط لاستلام التحصيل. أنشئ الحساب هنا وسيظهر بعدها في نفس العملية.</p><button type="button" class="button" id="createAccountFromCustomerCollection">＋ إنشاء حساب نقدية / بنك</button></div>';
         modal.querySelector('#createAccountFromCustomerCollection').onclick = () => openMoneyAccountModal((created) => {
           activeAccounts.push(created);
           renderCollectionPane();
@@ -195,121 +190,69 @@
         return;
       }
 
-      if (!openInvoices.length) {
-        pane.innerHTML = `
-          <div class="panel note-panel">
-            <h3>لا توجد فواتير مستحقة للتحصيل</h3>
-            <p>${Number(balance.amount_due || 0) > 0
-              ? 'يوجد رصيد مستحق في الحساب لكنه ليس موزعًا على فواتير مبيعات مفتوحة في V1 الحالي.'
-              : 'الحساب لا يحتوي على فواتير مفتوحة حاليًا.'}</p>
-          </div>`;
+      const due = Math.max(Number(balance.amount_due || 0), 0);
+      if (!(due > 0)) {
+        pane.innerHTML = '<div class="panel note-panel"><h3>لا يوجد رصيد مستحق على هذا العميل</h3><p>الفواتير الظاهرة للحساب للمراجعة فقط.</p></div>';
         return;
       }
 
       pane.innerHTML = `
         <div class="panel" style="border:1px dashed #cbd5e1">
-          <div class="panel-head">
-            <div><h3>تحصيل من ${esc(customer.name)}</h3><span>اكتب إجمالي المبلغ ثم وزّعه على فواتير العميل. التوزيع لا يتجاوز المتبقي على أي فاتورة.</span></div>
-            <button type="button" class="button secondary" id="autoAllocateCustomer">توزيع على الأقدم</button>
-          </div>
+          <div class="panel-head"><div><h3>تحصيل من ${esc(customer.name)}</h3><span>اكتب الدفعة الفعلية على حساب العميل. لا تحتاج لاختيار فاتورة.</span></div><strong>${money(due)}</strong></div>
           <div class="form-grid">
-            <label>مبلغ التحصيل<input id="customerCollectionAmount" type="number" min="0.01" step="0.01" placeholder="مثال: 1,000" /></label>
-            <label>الحساب المستلم<select id="customerCollectionAccount"><option value="">اختر الحساب</option>${activeAccounts.map((a) => `<option value="${esc(a.id)}">${esc(a.name)} — ${kindLabel(a.kind)}</option>`).join('')}</select></label>
+            <label>مبلغ التحصيل<input id="customerCollectionAmount" type="number" min="0.01" max="${due}" step="0.01" placeholder="مثال: 1000" /></label>
+            <label>الحساب المستلم<select id="customerCollectionAccount"><option value="">اختر الحساب</option>${activeAccounts.map(a => '<option value="' + esc(a.id) + '">' + esc(a.name) + ' — ' + kindLabel(a.kind) + '</option>').join('')}</select></label>
           </div>
           <div class="form-grid">
             <label>تاريخ التحصيل<input id="customerCollectionDate" type="date" value="${today()}" required /></label>
             <label>المرجع<input id="customerCollectionReference" maxlength="120" placeholder="رقم إيصال / تحويل (اختياري)" /></label>
           </div>
           <label>ملاحظات<input id="customerCollectionNotes" maxlength="300" placeholder="ملاحظات (اختياري)" /></label>
-          <div id="customerAllocationBox" class="allocation-box" style="margin-top:10px"></div>
-          <div class="allocation-total"><span>إجمالي التوزيع</span><strong id="customerAllocationTotal">0 ج</strong></div>
-          <div class="modal-actions">
-            <button type="button" class="button secondary" id="cancelCustomerCollection">إغلاق التحصيل</button>
-            <button type="button" class="button" id="saveCustomerCollection">حفظ التحصيل</button>
-          </div>
+          <div class="allocation-total"><span>الرصيد بعد التحصيل</span><strong id="customerAfterCollection">"${money(due)}"</strong></div>
+          <div class="modal-actions"><button type="button" class="button secondary" id="cancelCustomerCollection">إغلاق التحصيل</button><button type="button" class="button" id="saveCustomerCollection">حفظ التحصيل</button></div>
           <div id="customerCollectionStatus" class="modal-status"></div>
         </div>`;
 
       const amount = modal.querySelector('#customerCollectionAmount');
-      const box = modal.querySelector('#customerAllocationBox');
-      const totalNode = modal.querySelector('#customerAllocationTotal');
+      const after = modal.querySelector('#customerAfterCollection');
       const status = modal.querySelector('#customerCollectionStatus');
-      const renderAllocations = () => {
-        box.innerHTML = openInvoices.map((inv) => `
-          <div class="allocation-row" data-customer-invoice="${esc(inv.invoice_id)}" data-max="${Number(inv.outstanding_total)}">
-            <div><b>${esc(inv.invoice_number)}</b><small>${esc(inv.invoice_date || '')}</small></div>
-            <span>${money(inv.outstanding_total)}</span>
-            <input type="number" min="0" max="${Number(inv.outstanding_total)}" step="0.01" value="0" placeholder="0" />
-          </div>`).join('');
-        box.querySelectorAll('input').forEach((input) => input.addEventListener('input', () => {
-          const max = Number(input.max || 0);
-          let value = Number(input.value || 0);
-          if (value < 0) value = 0;
-          if (value > max) value = max;
-          input.value = value ? String(value) : '';
-          const total = [...box.querySelectorAll('input')].reduce((s, x) => s + Number(x.value || 0), 0);
-          totalNode.textContent = money(total);
-        }));
+      const save = modal.querySelector('#saveCustomerCollection');
+      const refresh = () => {
+        const n = Number(amount.value || 0);
+        after.textContent = money(Math.max(due - n, 0));
+        status.className = 'modal-status';
+        status.textContent = n > due ? 'مبلغ التحصيل أكبر من رصيد العميل الحالي.' : '';
       };
-      renderAllocations();
-
-      modal.querySelector('#autoAllocateCustomer').onclick = () => {
-        let remaining = Number(amount.value || 0);
-        if (!(remaining > 0)) return status.textContent = 'اكتب مبلغ التحصيل أولًا.';
-        [...box.querySelectorAll('.allocation-row')].forEach((row) => {
-          const input = row.querySelector('input');
-          const max = Number(row.dataset.max || 0);
-          const assigned = Math.min(remaining, max);
-          input.value = assigned ? String(assigned) : '';
-          remaining -= assigned;
-        });
-        const total = [...box.querySelectorAll('input')].reduce((s, x) => s + Number(x.value || 0), 0);
-        totalNode.textContent = money(total);
-        status.textContent = remaining > 0 ? 'المبلغ أكبر من إجمالي المستحق على الفواتير المفتوحة.' : '';
-      };
-
+      amount.addEventListener('input', refresh);
       modal.querySelector('#cancelCustomerCollection').onclick = () => { pane.style.display = 'none'; };
-      modal.querySelector('#saveCustomerCollection').onclick = async () => {
-        status.className = 'modal-status info';
-        status.textContent = '';
-        const amountValue = Number(amount.value || 0);
+
+      save.onclick = async () => {
+        const n = Number(amount.value || 0);
         const accountId = modal.querySelector('#customerCollectionAccount').value;
-        const allocations = [...box.querySelectorAll('.allocation-row')].map((row) => ({
-          invoice_id: row.dataset.customerInvoice,
-          amount: Number(row.querySelector('input')?.value || 0)
-        })).filter((x) => x.amount > 0);
-        const allocationTotal = allocations.reduce((s, x) => s + x.amount, 0);
-
-        if (!(amountValue > 0)) return status.textContent = 'مبلغ التحصيل يجب أن يكون أكبر من صفر.';
+        if (!(n > 0)) return status.textContent = 'مبلغ التحصيل يجب أن يكون أكبر من صفر.';
+        if (n > due) return status.textContent = 'مبلغ التحصيل أكبر من رصيد العميل الحالي.';
         if (!accountId) return status.textContent = 'اختر الحساب المستلم.';
-        if (!allocations.length) return status.textContent = 'وزّع مبلغ التحصيل على فاتورة واحدة على الأقل.';
-        if (Math.abs(allocationTotal - amountValue) > 0.005) {
-          return status.textContent = `إجمالي التوزيع ${money(allocationTotal)} ولا يساوي مبلغ التحصيل ${money(amountValue)}.`;
-        }
-
-        const invalid = allocations.some((x) => {
-          const row = box.querySelector(`[data-customer-invoice="${CSS.escape(x.invoice_id)}"]`);
-          return Number(x.amount) > Number(row?.dataset?.max || 0);
-        });
-        if (invalid) return status.textContent = 'يوجد توزيع يتجاوز المتبقي على فاتورة.';
-        const save = modal.querySelector('#saveCustomerCollection');
         save.disabled = true;
         save.textContent = 'جارٍ الحفظ…';
-
+        status.className = 'modal-status info';
+        status.textContent = 'جارٍ تسجيل الحركة على حساب العميل…';
         try {
-          const { error } = await supabase.rpc('post_customer_collection', {
+          const { error } = await supabase.rpc('post_customer_collection_account', {
             p_customer_id: customerId,
-            p_amount: amountValue,
+            p_amount: n,
             p_collection_date: modal.querySelector('#customerCollectionDate').value,
             p_account_id: accountId,
-            p_allocations: allocations,
             p_reference: modal.querySelector('#customerCollectionReference').value.trim() || null,
-            p_notes: modal.querySelector('#customerCollectionNotes').value.trim() || null,
+            p_notes: modal.querySelector('#customerCollectionNotes').value.trim() || null
           });
           if (error) throw error;
           status.className = 'modal-status success';
-          status.textContent = 'تم تسجيل التحصيل وتوزيعه على حساب العميل.';
-          setTimeout(() => location.reload(), 450);
+          status.textContent = 'تم تسجيل التحصيل على حساب العميل الفعلي.';
+          setTimeout(() => {
+            modal.remove();
+            clearReadCache();
+            renderRoute(true);
+          }, 350);
         } catch (err) {
           status.className = 'modal-status error';
           status.textContent = 'تعذر تسجيل التحصيل: ' + err.message;
@@ -318,12 +261,6 @@
         }
       };
     };
-
-    modal.querySelector('#customerAccountCollect').onclick = () => {
-      pane.style.display = pane.style.display === 'none' ? 'block' : 'none';
-      if (pane.style.display === 'block') renderCollectionPane();
-    };
-
     if (autoCollect) {
       pane.style.display = 'block';
       renderCollectionPane();
