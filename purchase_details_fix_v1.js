@@ -1,12 +1,15 @@
 (() => {
   if (!document.getElementById('app')) return;
   async function openPurchaseDetails(purchaseId) {
+    const db = window.__masna3iClient || window.supabase?.createClient?.('https://favitcmfzdlvgtwicxmb.supabase.co','sb_publishable_to-VILINGqpWLu7Sod8ULQ_YBGMP7MZ');
+    if (!db) return alert('جلسة النظام غير جاهزة.');
+    window.__masna3iClient = db;
     const [inv, lines, mats, suppliers, totals] = await Promise.all([
-      client.from('purchase_invoices').select('id,invoice_number,supplier_id,purchase_date,notes').eq('id',purchaseId).limit(1),
-      client.from('purchase_lines').select('id,material_id,quantity,unit_price,color,line_total').eq('purchase_invoice_id',purchaseId).order('id'),
-      client.from('materials').select('id,code,name,unit'),
-      client.from('suppliers').select('id,name'),
-      client.from('v_purchase_totals').select('purchase_invoice_id,total_amount').eq('purchase_invoice_id',purchaseId).limit(1)
+      db.from('purchase_invoices').select('id,invoice_number,supplier_id,purchase_date,notes').eq('id',purchaseId).limit(1),
+      db.from('purchase_lines').select('id,material_id,quantity,unit_price,color,line_total').eq('purchase_invoice_id',purchaseId).order('id'),
+      db.from('materials').select('id,code,name,unit'),
+      db.from('suppliers').select('id,name'),
+      db.from('v_purchase_totals').select('purchase_invoice_id,total_amount').eq('purchase_invoice_id',purchaseId).limit(1)
     ]);
     const error=inv.error||lines.error||mats.error||suppliers.error||totals.error;
     if(error)return alert('تعذر تحميل تفاصيل الشراء: '+error.message);
