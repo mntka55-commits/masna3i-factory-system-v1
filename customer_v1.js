@@ -76,7 +76,7 @@
         if (error) throw error;
         status.className = 'modal-status success';
         status.textContent = 'تم حفظ العميل بنجاح.';
-        setTimeout(() => { close(); location.hash = 'accounts'; location.reload(); }, 400);
+        setTimeout(() => { close(); location.hash = 'accounts'; clearReadCache(); renderRoute(true); }, 400);
       } catch (err) {
         status.className = 'modal-status error';
         status.textContent = `تعذر حفظ العميل: ${err.message}`;
