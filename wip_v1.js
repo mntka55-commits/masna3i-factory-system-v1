@@ -54,7 +54,7 @@
 
       alert(`تم تحويل ${context.pieces} قطعة إلى READY بنجاح.`);
       location.hash = 'wip';
-      location.reload();
+      clearReadCache(); renderRoute(true);
     } catch (error) {
       button.disabled = false;
       button.textContent = 'تحويل إلى READY';
