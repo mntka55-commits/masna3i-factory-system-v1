@@ -151,20 +151,15 @@
     modal.querySelector('#closeCustomerAccount').onclick = close;
     modal.addEventListener('click', (e) => { if (e.target === modal) close(); });
 
-    const invoiceRows = invoices.map((r) => {
-      const due = Number(r.outstanding_total || 0);
-      const status = due > 0 ? '<span class="status-pill warning">مفتوحة</span>' : '<span class="status-pill ok">مكتملة</span>';
-      return `<tr>
+    const invoiceRows = invoices.map((r) => `
+      <tr>
         <td><b>${esc(r.invoice_number)}</b></td>
         <td>${esc(r.invoice_date || '—')}</td>
         <td>${money(r.invoice_total)}</td>
-        <td>${money(r.collected_total)}</td>
-        <td><b>${money(due)}</b></td>
-        <td>${status}</td>
-      </tr>`;
-    }).join('');
+        <td>${esc(r.sale_kind === 'clearance_sale' ? 'بيع تصفية' : r.sale_kind === 'return_redelivery' ? 'إعادة تسليم مرتجع' : 'بيع عادي')}</td>
+      </tr>`).join('');
     modal.querySelector('#customerInvoices').innerHTML = invoiceRows
-      ? `<div class="table-wrap"><table><thead><tr><th>الفاتورة</th><th>التاريخ</th><th>الإجمالي</th><th>المحصل</th><th>المتبقي</th><th>الحالة</th></tr></thead><tbody>${invoiceRows}</tbody></table></div>`
+      ? `<div class="table-wrap"><table><thead><tr><th>الفاتورة</th><th>التاريخ</th><th>الإجمالي</th><th>نوع البيع</th></tr></thead><tbody>${invoiceRows}</tbody></table></div>`
       : '<div class="empty-state"><b>لا توجد فواتير لهذا العميل حتى الآن.</b><span>عند تسجيل بيع باسم العميل ستظهر الفاتورة هنا.</span></div>';
 
     const statementRows = (statement || []).map((r) => `<tr>
