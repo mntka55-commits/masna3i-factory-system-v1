@@ -208,7 +208,7 @@
             <label>المرجع<input id="customerCollectionReference" maxlength="120" placeholder="رقم إيصال / تحويل (اختياري)" /></label>
           </div>
           <label>ملاحظات<input id="customerCollectionNotes" maxlength="300" placeholder="ملاحظات (اختياري)" /></label>
-          <div class="allocation-total"><span>الرصيد بعد التحصيل</span><strong id="customerAfterCollection">"${money(due)}"</strong></div>
+          <div class="allocation-total"><span>الرصيد بعد التحصيل</span><strong id="customerAfterCollection">${money(due)}</strong></div>
           <div class="modal-actions"><button type="button" class="button secondary" id="cancelCustomerCollection">إغلاق التحصيل</button><button type="button" class="button" id="saveCustomerCollection">حفظ التحصيل</button></div>
           <div id="customerCollectionStatus" class="modal-status"></div>
         </div>`;
