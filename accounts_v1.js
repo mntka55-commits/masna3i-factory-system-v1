@@ -4,7 +4,7 @@
   async function accountsView() {
   const [customerBalances, purchaseBalances, moneyBalances, expenses, suppliers, customers] = await Promise.all([
     fetchOne('v_customer_account_balances', 'customer_id,code,name,amount_due,customer_credit'),
-    fetchOne('v_purchase_balances', 'remaining_amount'),
+    fetchOne('v_supplier_account_balances', 'supplier_id,payable_balance'),
     fetchOne('v_money_balances', 'account_id,name,kind,balance,active'),
     fetchOne('expenses', 'amount,cost_type'),
     fetchOne('suppliers', 'id,name'),
@@ -12,7 +12,7 @@
   ]);
 
   const customerDue = customerBalances.reduce((s,r)=>s+Number(r.amount_due||0),0);
-  const supplierDue = purchaseBalances.reduce((s,r)=>s+Number(r.remaining_amount||0),0);
+  const supplierDue = purchaseBalances.reduce((s,r)=>s+Math.max(Number(r.payable_balance||0),0),0);
   const expenseTotal = expenses.reduce((s,r)=>s+Number(r.amount||0),0);
   const cash = moneyBalances.reduce((s,r)=>s+Number(r.balance||0),0);
   const activeAccounts = moneyBalances.filter((a) => a.active);
