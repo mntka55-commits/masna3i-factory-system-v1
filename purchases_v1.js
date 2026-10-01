@@ -116,7 +116,7 @@
       fetchOne('suppliers', 'id,name'),
       fetchOne('v_purchase_totals', 'purchase_invoice_id,total_amount'),
     ]);
-    const rows = purchases.map((p) => `<tr><td>${escapeHtml(p.invoice_number)}</td><td>${escapeHtml(suppliers.find((s)=>s.id===p.supplier_id)?.name || '—')}</td><td>${escapeHtml(p.purchase_date)}</td><td>${money(totals.find((t)=>t.purchase_invoice_id===p.id)?.total_amount)}</td><td><button class="table-button">التفاصيل</button></td></tr>`);
+    const rows = purchases.map((p) => `<tr><td>${escapeHtml(p.invoice_number)}</td><td>${escapeHtml(suppliers.find((s)=>s.id===p.supplier_id)?.name || '—')}</td><td>${escapeHtml(p.purchase_date)}</td><td>${money(totals.find((t)=>t.purchase_invoice_id===p.id)?.total_amount)}</td><td><button class="table-button" type="button" data-purchase-details="${p.id}">التفاصيل</button></td></tr>`);
     document.getElementById('view').innerHTML = `<div class="hero"><div><h2>المشتريات</h2><p>الشراء يزيد المخزون ويسجل حركة المورد — ليس مصروف تشغيل.</p></div><button class="button">＋ شراء جديد</button></div><div class="panel purchase-note"><b>قاعدة تشغيلية:</b> الشراء يدخل المخزون ويحفظ سعره التاريخي لكل سطر شراء.</div><div class="panel">${table(['رقم الفاتورة','المورد','التاريخ','الإجمالي','الإجراء'], rows, 'لا توجد فواتير شراء حتى الآن.')}</div>`;
   }
   window.purchasesView = purchasesView;

@@ -157,7 +157,7 @@
         if (error) throw error;
         status.className = 'modal-status success';
         status.textContent = `تم ${clearance ? 'تسجيل بيع التصفية' : 'تسجيل البيع'} وإصدار الفاتورة بنجاح. رقم العملية: ${data?.invoice_id || 'تم الإنشاء'}`;
-        setTimeout(() => { close(); location.hash = 'sales'; location.reload(); }, 700);
+        setTimeout(() => { close(); location.hash = 'sales'; clearReadCache(); renderRoute(true); }, 700);
       } catch (e) {
         status.className = 'modal-status error';
         status.textContent = `تعذر تسجيل البيع: ${e.message}`;

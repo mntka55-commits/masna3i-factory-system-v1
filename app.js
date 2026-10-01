@@ -280,6 +280,10 @@ async function renderRoute(force = false) {
     return;
   }
 
+  const view = document.getElementById('view');
+  if (view) {
+    view.innerHTML = '<div class="panel empty-state"><b>جارٍ فتح الشاشة…</b><span>بنحمّل البيانات الفعلية، استنى لحظة.</span></div>';
+  }
   try {
     setStatus('جارٍ تحميل البيانات…');
     await loader();
@@ -297,8 +301,6 @@ async function renderRoute(force = false) {
 function bindNavigation() {
   if (document.documentElement.dataset.navigationBound === 'true') return;
   document.documentElement.dataset.navigationBound = 'true';
-  let navigationTimer = null;
-
   document.addEventListener('click', (event) => {
     const button = event.target.closest?.('[data-nav]');
     if (!button) return;
@@ -308,11 +310,7 @@ function bindNavigation() {
 
     event.preventDefault();
     event.stopImmediatePropagation();
-    clearTimeout(navigationTimer);
-
-    navigationTimer = window.setTimeout(() => {
-      if (location.hash !== '#' + key) location.hash = key;
-    }, 60);
+    if (location.hash !== '#' + key) location.hash = key;
   }, true);
 }
 

@@ -195,7 +195,7 @@
         setTimeout(() => {
           el.remove();
           location.hash = 'models';
-          location.reload();
+          clearReadCache(); renderRoute(true);
         }, 350);
       } catch (err) {
         status.textContent = `تعذر الحفظ: ${err.message}`;

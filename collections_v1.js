@@ -33,7 +33,7 @@
 
   document.getElementById('view').innerHTML = `
     <div class="hero">
-      <div><h2>التحصيلات</h2><p>ابدأ من حساب العميل ثم وزّع التحصيل على فواتيره. لا توجد قائمة فواتير عامة للتدوير عليها.</p></div>
+      <div><h2>التحصيلات</h2><p>ابدأ من حساب العميل وسجل التحصيل على حسابه مباشرة. الفواتير للمراجعة والتنظيم فقط.</p></div>
       <button class="button" data-open-customer-picker>＋ تحصيل من عميل</button>
     </div>
     ${!activeAccounts.length ? `<div class="panel note-panel">
@@ -44,7 +44,7 @@
     ${unassignedOpenInvoices.length ? `<div class="panel note-panel">
       <h3>تنبيه: فواتير بدون حساب عميل</h3>
       <p>يوجد ${qty(unassignedOpenInvoices.length)} فاتورة مستحقة بقيمة <b>${money(unassignedOutstanding)}</b> غير مرتبطة بعميل مسجل، لذلك لن تظهر داخل حساب عميل.</p>
-      <button class="button secondary" data-nav="invoices">مراجعة الفواتير</button>
+      <button class="button secondary" data-nav="invoices">مراجعة فواتير بدون عميل</button>
     </div>` : ''}
     <div class="stats-grid">
       ${statCard('▣', 'إجمالي المستحق من العملاء', money(totalOutstanding), `${qty(debtors.length)} عميل عليه مستحق`)}
@@ -53,7 +53,7 @@
       ${statCard('↗', 'العملاء القابلون للتحصيل', qty(debtors.length), 'ابدأ من حساب العميل')}
     </div>
     <div class="panel">
-      <div class="panel-head"><div><h3>حسابات العملاء المفتوحة</h3><span>الاختيار هنا على العميل، والفواتير تظهر داخل حسابه فقط.</span></div></div>
+      <div class="panel-head"><div><h3>حسابات العملاء المفتوحة</h3><span>التحصيل يتم على حساب العميل مباشرة، والفواتير تظهر داخل حسابه للمراجعة فقط.</span></div></div>
       ${table(['العميل','الكود','المستحق','لصالح العميل','الإجراء'], debtors.map((r) => `
         <tr>
           <td><b>${escapeHtml(r.name)}</b></td>
