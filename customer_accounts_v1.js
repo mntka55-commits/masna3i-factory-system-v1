@@ -256,6 +256,10 @@
         }
       };
     };
+    modal.querySelector('#customerAccountCollect').onclick = () => {
+      pane.style.display = pane.style.display === 'none' ? 'block' : 'none';
+      if (pane.style.display === 'block') renderCollectionPane();
+    };
     if (autoCollect) {
       pane.style.display = 'block';
       renderCollectionPane();
