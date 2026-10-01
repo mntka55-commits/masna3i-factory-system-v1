@@ -78,6 +78,15 @@
   }
 
   document.addEventListener('click', (event) => {
+    const button = event.target.closest('[data-pay-supplier]');
+    if (!button) return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    if (typeof window.__openSupplierPaymentModal !== 'function') return;
+    window.__openSupplierPaymentModal(button.dataset.paySupplier);
+  }, true);
+
+  document.addEventListener('click', (event) => {
     const button = event.target.closest('[data-add-supplier]');
     if (!button) return;
     event.preventDefault();
@@ -88,7 +97,7 @@
 
   async function suppliersView() {
     const suppliers = await fetchOne('suppliers', 'id,name,phone,notes');
-    const rows = suppliers.map(s => `<tr><td><b>${escapeHtml(s.name)}</b></td><td>${escapeHtml(s.phone || '—')}</td><td>${escapeHtml(s.notes || '—')}</td><td><button class="table-button" data-account-statement="${escapeHtml(s.id)}" data-account-type="supplier">كشف الحساب</button></td></tr>`);
+    const rows = suppliers.map(s => `<tr><td><b>${escapeHtml(s.name)}</b></td><td>${escapeHtml(s.phone || '—')}</td><td>${escapeHtml(s.notes || '—')}</td><td><button class="table-button" data-account-statement="${escapeHtml(s.id)}" data-account-type="supplier">كشف الحساب</button> <button class="table-button" data-pay-supplier="${escapeHtml(s.id)}">سداد للمورد</button></td></tr>`);
     document.getElementById('view').innerHTML = `<div class="hero"><div><h2>الموردين</h2><p>إدارة بيانات الموردين المستخدمة في المشتريات ومدفوعاتهم ومرتجعاتهم.</p></div><div class="hero-actions"><button class="button secondary" data-open-supplier-return>↩ مرتجع شراء</button><button class="button" data-add-supplier>＋ إضافة مورد</button></div></div><div class="panel">${table(['اسم المورد','الهاتف','ملاحظات','الحساب'], rows, 'لا يوجد موردون مسجلون حتى الآن.')}</div><div class="panel" id="supplierReturnsPanel" style="margin-top:14px"><div class="empty-state"><b>جارٍ تحميل مرتجعات الموردين…</b></div></div>`;
     window.__masna3iRenderSupplierReturnsPanel?.();
   }
