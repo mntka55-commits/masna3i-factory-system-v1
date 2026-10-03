@@ -72,7 +72,10 @@ const money = (value) => `${currency.format(Number(value || 0))} ج`;
 const qty = (value) => number.format(Number(value || 0));
 const escapeHtml = (value) => String(value ?? '').replace(/[&<>'"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#039;', '"': '&quot;' }[c]));
 
-function pageTitle(key) { return NAV.find(([id]) => id === key)?.[2] || 'مصنعي'; }
+function pageTitle(key) {
+  const titleKey = key === 'model-detail' ? 'models' : key;
+  return NAV.find(([id]) => id === titleKey)?.[2] || 'مصنعي';
+}
 
 function draftKey(form) {
   if (!form || form.dataset.draftSkip === 'true' || form.id === 'loginForm' || form.id === 'factoryForm') return null;
@@ -251,8 +254,9 @@ async function buildShell() {
 }
 
 function setActiveNav(key) {
-  document.querySelectorAll('.nav-item').forEach((button) => button.classList.toggle('active', button.dataset.nav === key));
-  document.getElementById('pageHeading').textContent = pageTitle(key);
+  const activeKey = key === 'model-detail' ? 'models' : key;
+  document.querySelectorAll('.nav-item').forEach((button) => button.classList.toggle('active', button.dataset.nav === activeKey));
+  document.getElementById('pageHeading').textContent = pageTitle(activeKey);
 }
 
 function statCard(icon, label, value, meta = '') {
